@@ -1,34 +1,46 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../widgets/reminder_dialog.dart';
+import '../vocabulary/topic_screen.dart';
+import '../flashcard/flashcard_screen.dart';
+import '../challenge/challenge_screen.dart';
+import '../grammar/grammar_detail_screen.dart';
+import '../leaderboard/leaderboard_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final Function(int)? onSwitchTab; // Bổ sung hàm callback để đổi tab
+  const HomeScreen({Key? key, this.onSwitchTab}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA), // Màu nền xanh nhạt theo ảnh
+      backgroundColor: const Color(0xFFF4F6FA),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildHeader(context),
               const SizedBox(height: 25),
-              _buildProgressSection(),
+              _buildProgressSection(context),
               const SizedBox(height: 25),
-              _buildSectionTitle('Danh mục học tập', 'Xem tất cả >'),
+
+              _buildSectionTitle('Danh mục học tập'),
               const SizedBox(height: 15),
-              _buildCategories(),
+              _buildCategories(context),
               const SizedBox(height: 25),
-              _buildSectionTitle('Bài học gợi ý cho bạn', 'Xem tất cả >'),
+
+              _buildSectionTitle('Bài học gợi ý cho bạn'),
               const SizedBox(height: 15),
-              _buildSuggestedLessons(),
+              _buildSuggestedLessons(context), // Truyền context vào đây
               const SizedBox(height: 25),
-              _buildSectionTitle('Thử thách hôm nay', 'Xem tất cả >'),
+
+              _buildSectionTitle('Thử thách hôm nay'),
               const SizedBox(height: 15),
-              _buildChallengeSection(),
+              _buildChallengeSection(context),
+              const SizedBox(height: 25),
+              _buildLeaderboardBanner(context),
               const SizedBox(height: 20),
             ],
           ),
@@ -37,24 +49,22 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Header: Xin chào, Avatar, Chuỗi ngày (Streak)
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Column(
       children: [
         Row(
           children: [
-            // Avatar
             const CircleAvatar(
               radius: 24,
               backgroundColor: Colors.blueAccent,
-              child: Icon(Icons.person, color: Colors.white), // Thay bằng Image.asset nếu có ảnh
+              child: Icon(Icons.person, color: Colors.white),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                Text('Minh 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                Text('Huy 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
               ],
             ),
             const Spacer(),
@@ -64,7 +74,7 @@ class HomeScreen extends StatelessWidget {
                 backgroundColor: Colors.red,
                 child: Icon(Icons.notifications_none, color: Color(0xFF1E293B)),
               ),
-              onPressed: () {},
+              onPressed: () => ReminderDialog.show(context),
             ),
             const Icon(Icons.settings_outlined, color: Color(0xFF1E293B)),
           ],
@@ -108,8 +118,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Section Tiến độ hôm nay
-  Widget _buildProgressSection() {
+  Widget _buildProgressSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -142,38 +151,43 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F5FF),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Colors.blue.shade100, borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Tiếp tục học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                      SizedBox(height: 4),
-                      Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      SizedBox(height: 4),
-                      Text('Bài 12/20 • 8 phút', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                    ],
+          GestureDetector(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Business Vocabulary')));
+            },
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F5FF),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.blue.shade100, borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
                   ),
-                ),
-                const CircleAvatar(
-                  backgroundColor: AppTheme.primaryColor,
-                  radius: 20,
-                  child: Icon(Icons.play_arrow, color: Colors.white),
-                )
-              ],
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Tiếp tục học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                        SizedBox(height: 4),
+                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        SizedBox(height: 4),
+                        Text('Bài 12/20 • 8 phút', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const CircleAvatar(
+                    backgroundColor: AppTheme.primaryColor,
+                    radius: 20,
+                    child: Icon(Icons.play_arrow, color: Colors.white),
+                  )
+                ],
+              ),
             ),
           )
         ],
@@ -181,156 +195,167 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Section Danh mục học tập
-  Widget _buildCategories() {
-    return Column(
+  Widget _buildCategories(BuildContext context) {
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(child: _buildCategoryCard('Từ vựng', 'Hơn 2000+ từ', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildCategoryCard('Ngữ pháp', 'Các chủ điểm', Icons.description, const Color(0xFFF3E5F5), Colors.purple)),
-          ],
+        Expanded(
+          child: _buildCategoryCard(
+            'Từ vựng', 'Hơn 2000+ từ', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green,
+                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TopicScreen(initialIndex: 0))),
+          ),
         ),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(child: _buildCategoryCard('Listening', 'Luyện nghe', Icons.headphones, const Color(0xFFFFEBEE), Colors.redAccent)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildCategoryCard('Speaking', 'Luyện nói', Icons.mic, const Color(0xFFFFF3E0), Colors.orange)),
-          ],
+        const SizedBox(width: 15),
+        Expanded(
+          child: _buildCategoryCard(
+            'Ngữ pháp', 'Các chủ điểm', Icons.description, const Color(0xFFF3E5F5), Colors.purple,
+                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TopicScreen(initialIndex: 1))),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCategoryCard(String title, String subtitle, IconData icon, Color bgColor, Color iconColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-              ],
+  Widget _buildCategoryCard(String title, String subtitle, IconData icon, Color bgColor, Color iconColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.black38, size: 20),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.black38, size: 20),
+          ],
+        ),
       ),
     );
   }
 
-  // Section Bài học gợi ý (Scroll ngang)
-  Widget _buildSuggestedLessons() {
+  // Thêm tham số context và gán hàm onTap điều hướng
+  Widget _buildSuggestedLessons(BuildContext context) {
     return SizedBox(
       height: 220,
       child: ListView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         children: [
-          _buildLessonCard('Travel Vocabulary', 'A2', 0.6, '20 từ', '8 phút', Colors.blue.shade100),
+          _buildLessonCard(
+            'Travel Vocabulary', 'A2', 0.6, '20 từ', '8 phút', Colors.blue.shade100,
+                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Travel Vocabulary'))),
+          ),
           const SizedBox(width: 15),
-          _buildLessonCard('Present Simple', 'A2', 0.4, '3 bài', '12 phút', Colors.purple.shade100),
+          _buildLessonCard(
+            'Present Simple', 'A2', 0.4, '3 bài', '12 phút', Colors.purple.shade100,
+                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GrammarDetailScreen(title: 'Present Simple'))),
+          ),
           const SizedBox(width: 15),
-          _buildLessonCard('Daily Conversation', 'B1', 0.2, '15 câu', '10 phút', Colors.orange.shade100),
+          _buildLessonCard(
+            'Daily Conversation', 'B1', 0.2, '15 câu', '10 phút', Colors.orange.shade100,
+                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Daily Conversation'))),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLessonCard(String title, String level, double progress, String data1, String data2, Color imageBg) {
-    return Container(
-      width: 200,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Khu vực ảnh (dùng Container màu tạm, bạn thay bằng Image.asset sau)
-          Stack(
-            children: [
-              Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: imageBg,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: const Center(child: Icon(Icons.image, color: Colors.white54, size: 40)),
-              ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(level, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
-              )
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  // Bổ sung GestureDetector và tham số VoidCallback onTap
+  Widget _buildLessonCard(String title, String level, double progress, String data1, String data2, Color imageBg, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 200,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.grey.shade200,
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  ],
+                Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: imageBg,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: const Center(child: Icon(Icons.image, color: Colors.white54, size: 40)),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
-                    const SizedBox(width: 4),
-                    Text(data1, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
-                    const Spacer(),
-                    const Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
-                    const SizedBox(width: 4),
-                    Text(data2, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
-                  ],
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(level, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
                 )
               ],
             ),
-          )
-        ],
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.grey.shade200,
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
+                      const SizedBox(width: 4),
+                      Text(data1, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                      const Spacer(),
+                      const Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
+                      const SizedBox(width: 4),
+                      Text(data2, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                    ],
+                  )
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
 
-  // Section Thử thách hôm nay
-  Widget _buildChallengeSection() {
+  Widget _buildChallengeSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -361,7 +386,14 @@ class HomeScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            onPressed: () {},
+            onPressed: () {
+              // Gọi hàm chuyển tab (Tab Thử thách ở vị trí số 3) thay vì Push đè trang mới
+              if (onSwitchTab != null) {
+                onSwitchTab!(3);
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const ChallengeScreen()));
+              }
+            },
             child: const Text('Bắt đầu', style: TextStyle(color: Colors.white, fontSize: 12)),
           )
         ],
@@ -369,14 +401,69 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Helper Title
-  Widget _buildSectionTitle(String title, String actionText) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(actionText, style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
-      ],
+  Widget _buildLeaderboardBanner(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LeaderboardScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFB703), Color(0xFFFB8500)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.emoji_events, color: Colors.white, size: 30),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Bảng Xếp Hạng Top 50',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Xem vị trí của bạn và các học viên khác',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
     );
   }
 }

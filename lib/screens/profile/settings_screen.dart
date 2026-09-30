@@ -76,11 +76,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (trailingText != null) Text(trailingText, style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+          if (trailingText != null) Text(trailingText, style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
           if (trailingText != null) const SizedBox(width: 5),
           const Icon(Icons.chevron_right, color: AppTheme.greyColor, size: 20),
         ],
       ),
-      onTap: () {},
+      onTap: () {
+        // Phản hồi UI khi bấm vào
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Chức năng $title đang được phát triển'), duration: const Duration(seconds: 1)),
+        );
+      },
     );
   }
 

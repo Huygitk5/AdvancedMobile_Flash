@@ -17,12 +17,18 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   // Sắp xếp các màn hình tương ứng với thứ tự dưới thanh BottomNavigationBar
-  final List<Widget> _pages = [
-    const HomeScreen(),                        // 0: Trang chủ
-    const TopicScreen(),                       // 1: Học tập (Từ vựng + Ngữ pháp)
-    const ProgressScreen(),                    // 2: Tiến độ học tập
-    const ChallengeScreen(),    // 3: Thử thách (Làm sau)
-    const ProfileScreen(),     // 4: Tài khoản (Làm sau)
+  List<Widget> get _pages => [
+    HomeScreen(
+      onSwitchTab: (index) {
+        setState(() {
+          _currentIndex = index; // Lắng nghe và cập nhật tab khi Home yêu cầu
+        });
+      },
+    ),
+    const TopicScreen(),
+    const ProgressScreen(),
+    const ChallengeScreen(),
+    const ProfileScreen(),
   ];
 
   @override

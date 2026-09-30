@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../main/main_screen.dart';
+import '../auth/login_screen.dart';
+import '../auth/register_screen.dart';
+
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({Key? key}) : super(key: key);
@@ -57,29 +60,6 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const Spacer(),
 
-              // Nút Bắt đầu
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  onPressed: () {
-                    // Chuyển sang màn hình chính
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MainScreen()),
-                    );
-                  },
-                  child: const Text('Bắt đầu', style: TextStyle(fontSize: 16, color: Colors.white)),
-                ),
-              ),
-              const SizedBox(height: 16),
-
               // Nút Đăng nhập
               SizedBox(
                 width: double.infinity,
@@ -91,11 +71,38 @@ class WelcomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  },
                   child: const Text('Đăng nhập', style: TextStyle(fontSize: 16, color: AppTheme.primaryColor)),
                 ),
               ),
               const SizedBox(height: 30),
+
+              // Nút Đăng ký
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                    );
+                  },
+                  child: const Text('Đăng ký', style: TextStyle(fontSize: 16, color: Colors.white)),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Đăng nhập MXH
               const Text('Hoặc tiếp tục với', style: TextStyle(color: AppTheme.greyColor)),

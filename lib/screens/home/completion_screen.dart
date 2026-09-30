@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../main/main_screen.dart';
 
 class CompletionScreen extends StatelessWidget {
   const CompletionScreen({Key? key}) : super(key: key);
@@ -49,7 +50,11 @@ class CompletionScreen extends StatelessWidget {
                   ),
                   onPressed: () {
                     // Quay về trang chủ
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MainScreen()),
+                          (route) => false, // Lệnh này giúp xóa sạch lịch sử điều hướng đằng trước
+                    );
                   },
                   child: const Text('Quay về trang chủ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
