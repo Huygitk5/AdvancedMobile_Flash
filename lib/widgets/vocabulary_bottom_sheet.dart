@@ -48,8 +48,7 @@ class VocabularyBottomSheet {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Text('(n.)', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(width: 8),
+                Text('(${card.partOfSpeech})', style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),                const SizedBox(width: 8),
                 Text(card.meaning, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
               ],
             ),

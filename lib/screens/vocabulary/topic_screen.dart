@@ -1,19 +1,70 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/mock_data.dart';
+import '../../models/topic_model.dart';
 import '../flashcard/flashcard_screen.dart';
-import '../grammar/grammar_detail_screen.dart'; // Đã import màn hình ngữ pháp
+import '../grammar/grammar_detail_screen.dart';
 
-class TopicScreen extends StatelessWidget {
-  const TopicScreen({Key? key}) : super(key: key);
+class TopicScreen extends StatefulWidget {
+  final int initialIndex;
+
+  const TopicScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+
+  @override
+  State<TopicScreen> createState() => _TopicScreenState();
+}
+
+class _TopicScreenState extends State<TopicScreen> {
+  // Các biến lưu trữ trạng thái tìm kiếm và bộ lọc
+  String searchQuery = '';
+  String selectedFilter = 'Tất cả';
+
+  // Hàm xử lý logic lọc Từ vựng
+  List<Topic> get filteredVocabulary {
+    return MockData.vocabularyTopics.where((topic) {
+      // 1. Lọc theo tên (Search)
+      bool matchSearch = topic.title.toLowerCase().contains(searchQuery.toLowerCase());
+
+      // 2. Lọc theo trạng thái (Filter Chips)
+      bool matchFilter = true;
+      if (selectedFilter == 'Đang học') {
+        matchFilter = topic.progress > 0 && topic.progress < 1.0;
+      } else if (selectedFilter == 'Đã hoàn thành') {
+        matchFilter = topic.progress >= 1.0;
+      }
+
+      return matchSearch && matchFilter;
+    }).toList();
+  }
+
+  // Hàm xử lý logic lọc Ngữ pháp
+  List<Map<String, dynamic>> get filteredGrammar {
+    return MockData.grammarTopics.where((grammar) {
+      // 1. Lọc theo tên (Search)
+      bool matchSearch = grammar['title'].toString().toLowerCase().contains(searchQuery.toLowerCase());
+
+      // 2. Lọc theo trạng thái (Filter Chips)
+      bool matchFilter = true;
+      double progress = grammar['progress'];
+      if (selectedFilter == 'Đang học') {
+        matchFilter = progress > 0 && progress < 1.0;
+      } else if (selectedFilter == 'Đã hoàn thành') {
+        matchFilter = progress >= 1.0;
+      }
+
+      return matchSearch && matchFilter;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialIndex,
       child: Scaffold(
         backgroundColor: const Color(0xFFF4F6FA),
         appBar: AppBar(
+          automaticallyImplyLeading: false, // Đã ẩn nút Back
           backgroundColor: Colors.white,
           elevation: 0,
           title: const Text('Học tập', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold)),
@@ -40,17 +91,20 @@ class TopicScreen extends StatelessWidget {
   }
 
   Widget _buildVocabularyTab(BuildContext context) {
+    final list = filteredVocabulary; // Lấy danh sách đã được lọc
+
     return Column(
       children: [
         _buildSearchBar('Tìm chủ đề, từ vựng...'),
         _buildFilterChips(),
         Expanded(
-          child: ListView.builder(
+          child: list.isEmpty
+              ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
+              : ListView.builder(
             padding: const EdgeInsets.all(20.0),
-            itemCount: MockData.vocabularyTopics.length,
+            itemCount: list.length,
             itemBuilder: (context, index) {
-              final topic = MockData.vocabularyTopics[index];
-              return _buildVocabularyCard(context, topic);
+              return _buildVocabularyCard(context, list[index]);
             },
           ),
         ),
@@ -59,17 +113,20 @@ class TopicScreen extends StatelessWidget {
   }
 
   Widget _buildGrammarTab(BuildContext context) {
+    final list = filteredGrammar; // Lấy danh sách đã được lọc
+
     return Column(
       children: [
         _buildSearchBar('Tìm điểm ngữ pháp...'),
         _buildFilterChips(),
         Expanded(
-          child: ListView.builder(
+          child: list.isEmpty
+              ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
+              : ListView.builder(
             padding: const EdgeInsets.all(20.0),
-            itemCount: MockData.grammarTopics.length,
+            itemCount: list.length,
             itemBuilder: (context, index) {
-              final grammar = MockData.grammarTopics[index];
-              return _buildGrammarCard(context, grammar);
+              return _buildGrammarCard(context, list[index]);
             },
           ),
         ),
@@ -77,10 +134,16 @@ class TopicScreen extends StatelessWidget {
     );
   }
 
+  // Cập nhật thanh tìm kiếm để nhận sự kiện gõ phím
   Widget _buildSearchBar(String hint) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: TextField(
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value; // Cập nhật từ khóa tìm kiếm
+          });
+        },
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: const Icon(Icons.search, color: AppTheme.greyColor),
@@ -101,39 +164,48 @@ class TopicScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
       child: Row(
         children: [
-          _buildChip('Tất cả', isActive: true),
+          _buildChip('Tất cả'),
           const SizedBox(width: 10),
-          _buildChip('Đang học', isActive: false),
+          _buildChip('Đang học'),
           const SizedBox(width: 10),
-          _buildChip('Đã hoàn thành', isActive: false),
+          _buildChip('Đã hoàn thành'),
         ],
       ),
     );
   }
 
-  Widget _buildChip(String label, {required bool isActive}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isActive ? AppTheme.primaryColor : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: isActive ? null : Border.all(color: Colors.grey.shade300),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isActive ? Colors.white : AppTheme.greyColor,
-          fontWeight: FontWeight.w500,
-          fontSize: 13,
+  // Cập nhật Nút bấm bộ lọc để nhận sự kiện click
+  Widget _buildChip(String label) {
+    bool isActive = selectedFilter == label;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedFilter = label; // Cập nhật bộ lọc được chọn
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: isActive ? null : Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : AppTheme.greyColor,
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildVocabularyCard(BuildContext context, dynamic topic) {
+  Widget _buildVocabularyCard(BuildContext context, Topic topic) {
     return GestureDetector(
       onTap: () {
-        // CHUYỂN SANG MÀN FLASHCARD
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: topic.title)),
@@ -205,7 +277,6 @@ class TopicScreen extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        // CHUYỂN SANG MÀN CHI TIẾT NGỮ PHÁP
         Navigator.push(
           context,
           MaterialPageRoute(

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../models/flashcard_model.dart';
 import '../../core/theme.dart';
+import '../../widgets/vocabulary_bottom_sheet.dart';
+import '../home/completion_screen.dart';
 
 class FlashcardScreen extends StatefulWidget {
   final String topicTitle;
@@ -24,8 +26,10 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         isFlipped = false;
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã hoàn thành bài học! Chuẩn bị kiểm tra.')),
+      // Điều hướng tới Màn hình Hoàn thành bài học
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const CompletionScreen()),
       );
     }
   }
@@ -43,6 +47,56 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     setState(() {
       isFlipped = !isFlipped;
     });
+  }
+
+  void _showNoteDialog(Flashcard card) {
+    // Khởi tạo controller với nội dung ghi chú cũ (nếu có)
+    TextEditingController noteController = TextEditingController(text: card.note);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+            'Ghi chú cho "${card.word}"',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+        ),
+        content: TextField(
+          controller: noteController,
+          maxLines: 4, // Ô nhập liệu rộng 4 dòng
+          decoration: InputDecoration(
+            hintText: 'Nhập mẹo nhớ, ngữ cảnh sử dụng...',
+            hintStyle: const TextStyle(color: AppTheme.greyColor, fontSize: 14),
+            filled: true,
+            fillColor: const Color(0xFFF4F6FA),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            onPressed: () {
+              // Cập nhật lại note vào object Flashcard và reload UI
+              setState(() {
+                card.note = noteController.text.trim();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Lưu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -94,7 +148,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               const SizedBox(height: 25),
               _buildActionButtons(),
               const SizedBox(height: 20),
-              _buildNoteSection(),
+              _buildNoteSection(currentCard),
               const SizedBox(height: 10),
             ],
           ),
@@ -192,7 +246,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             right: 15,
             child: GestureDetector(
               onTap: () {
-                // Xử lý phát âm thanh
+                // Hiển thị Bottom Sheet chi tiết từ vựng
+                VocabularyBottomSheet.show(context, card);
               },
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -230,9 +285,9 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             color: Colors.blue.shade50,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Text(
-            '(n.)',
-            style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
+          child: Text(
+            '(${card.partOfSpeech})', // Xóa chữ 'const' trước Text và dùng nội suy chuỗi
+            style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
           ),
         ),
       ],
@@ -261,9 +316,9 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text(
-              '(n.)',
-              style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
+            child: Text(
+              '(${card.partOfSpeech})', // Xóa chữ 'const' trước Text và dùng nội suy chuỗi
+              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
             ),
           ),
 
@@ -403,33 +458,53 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     );
   }
 
-  Widget _buildNoteSection() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FF),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: const Icon(Icons.star, color: Colors.blueAccent, size: 20),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Ghi chú', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                SizedBox(height: 4),
-                Text('Nhấn để thêm ghi chú cho từ này', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              ],
+  // Thêm tham số Flashcard card vào hàm
+  Widget _buildNoteSection(Flashcard card) {
+    // Kiểm tra xem thẻ này đã có ghi chú chưa
+    bool hasNote = card.note != null && card.note!.isNotEmpty;
+
+    return GestureDetector(
+      onTap: () => _showNoteDialog(card), // Mở hộp thoại khi bấm vào
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: hasNote ? Colors.white : const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: hasNote ? AppTheme.primaryColor.withOpacity(0.3) : Colors.transparent),
+          boxShadow: hasNote ? [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))] : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: hasNote ? Colors.blue.shade50 : Colors.white,
+                  shape: BoxShape.circle
+              ),
+              child: Icon(Icons.edit_note, color: hasNote ? AppTheme.primaryColor : Colors.blueAccent, size: 20),
             ),
-          ),
-          const Icon(Icons.edit_outlined, color: AppTheme.greyColor, size: 20),
-        ],
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Ghi chú cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                  const SizedBox(height: 4),
+                  // Hiển thị ghi chú thật nếu có, ngược lại hiện chữ gợi ý
+                  Text(
+                    hasNote ? card.note! : 'Nhấn vào để thêm ghi chú cho từ này...',
+                    style: TextStyle(
+                      color: hasNote ? const Color(0xFF1E293B) : AppTheme.greyColor,
+                      fontSize: 13,
+                      fontStyle: hasNote ? FontStyle.normal : FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(hasNote ? Icons.edit : Icons.add_circle_outline, color: AppTheme.greyColor, size: 20),
+          ],
+        ),
       ),
     );
   }
