@@ -1,14 +1,14 @@
 class LeaderboardUser {
   final String id;
   final String name;
-  final int totalXp;
+  final int totalLifetimeXp;
   final int longestStreak;
-  final String note;
+  String note;
 
   LeaderboardUser({
     required this.id,
     required this.name,
-    required this.totalXp,
+    required this.totalLifetimeXp,
     required this.longestStreak,
     required this.note,
   });
@@ -17,7 +17,7 @@ class LeaderboardUser {
     return LeaderboardUser(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
-      totalXp: json['totalXp'] ?? 0,
+      totalLifetimeXp: json['totalLifetimeXp'] ?? 0,
       longestStreak: json['longestStreak'] ?? 0,
       note: json['note'] ?? '',
     );
