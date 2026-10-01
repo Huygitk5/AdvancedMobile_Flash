@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import 'dart:math';
+import '../../data/mock_data.dart';
+import '../../models/daily_statistic_model.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({Key? key}) : super(key: key);
@@ -117,7 +120,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             height: 120,
             width: double.infinity,
             child: CustomPaint(
-              painter: LineChartPainter(),
+              painter: LineChartPainter(stats: MockData.weeklyStats), // Truyền dữ liệu vào
             ),
           ),
           const SizedBox(height: 10),
@@ -256,70 +259,53 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
 // Lớp vẽ biểu đồ giả lập dữ liệu theo thiết kế
 class LineChartPainter extends CustomPainter {
+  final List<DailyStatistic> stats;
+
+  LineChartPainter({required this.stats});
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paintLine = Paint()
-      ..color = AppTheme.primaryColor
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    if (stats.isEmpty) return;
 
-    // Các điểm giả lập dữ liệu: T2 đến CN
-    final points = [
-      Offset(0, size.height * 0.8),
-      Offset(size.width * 0.16, size.height * 0.5),
-      Offset(size.width * 0.33, size.height * 0.6),
-      Offset(size.width * 0.5, size.height * 0.3),
-      Offset(size.width * 0.66, size.height * 0.55),
-      Offset(size.width * 0.83, size.height * 0.2),
-      Offset(size.width, size.height * 0.05),
-    ];
+    final paintLine = Paint()..color = AppTheme.primaryColor..strokeWidth = 3..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
+
+    // Tìm giá trị lớn nhất để lấy tỷ lệ vẽ (Scaling)
+    int maxWords = stats.map((s) => s.wordsLearned).fold(0, (prev, amount) => max(prev, amount));
+    if (maxWords == 0) maxWords = 1; // Tránh chia cho 0
+
+    List<Offset> points = [];
+    for (int i = 0; i < stats.length; i++) {
+      // Chia đều không gian X cho số lượng ngày (7 ngày)
+      double x = i * (size.width / (stats.length - 1));
+      // Tính Y dựa trên tỷ lệ % của ngày đó so với ngày cao nhất (chừa 20% lề trên)
+      double y = size.height - (stats[i].wordsLearned / maxWords) * (size.height * 0.8);
+      points.add(Offset(x, y));
+    }
 
     final path = Path();
     path.moveTo(points.first.dx, points.first.dy);
-
-    // Vẽ đường thẳng nối các điểm (nếu muốn đường cong bezier thì dùng quadraticBezierTo)
     for (int i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
+      path.lineTo(points[i].dx, points[i].dy); // Vẽ các đoạn thẳng nối lại
     }
 
-    // Vẽ nền mờ (Gradient dưới đường line)
-    final fillPath = Path.from(path)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
+    final fillPath = Path.from(path)..lineTo(size.width, size.height)..lineTo(0, size.height)..close();
     final gradientPaint = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
         colors: [AppTheme.primaryColor.withOpacity(0.3), AppTheme.primaryColor.withOpacity(0.0)],
       ).createShader(Rect.fromLTRB(0, 0, size.width, size.height));
 
     canvas.drawPath(fillPath, gradientPaint);
     canvas.drawPath(path, paintLine);
 
-    // Vẽ các chấm tròn trên biểu đồ
-    final dotPaint = Paint()
-      ..color = AppTheme.primaryColor
-      ..style = PaintingStyle.fill;
-    final dotBgPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
+    final dotPaint = Paint()..color = AppTheme.primaryColor..style = PaintingStyle.fill;
+    final dotBgPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
     for (var point in points) {
       canvas.drawCircle(point, 5, dotBgPaint);
       canvas.drawCircle(point, 3, dotPaint);
     }
-
-    // Vẽ các đường Grid ngang (đứt nét hoặc mờ)
-    final gridPaint = Paint()
-      ..color = Colors.grey.shade200
-      ..strokeWidth = 1;
-    canvas.drawLine(Offset(0, size.height * 0.5), Offset(size.width, size.height * 0.5), gridPaint);
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), gridPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true; // Cập nhật khi data đổi
 }

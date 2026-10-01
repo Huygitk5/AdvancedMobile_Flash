@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../models/quiz_result_model.dart';
 
 class QuizResultScreen extends StatelessWidget {
-  const QuizResultScreen({Key? key}) : super(key: key);
+  final QuizResult result; // Yêu cầu truyền kết quả vào khi mở trang
+
+  const QuizResultScreen({Key? key, required this.result}) : super(key: key);
+
+  // Hàm chuyển đổi giây sang định dạng "X phút Y giây"
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '$minutes phút $remainingSeconds giây';
+  }
 
   @override
   Widget build(BuildContext context) {
+    int totalQuestions = result.correctAnswers + result.wrongAnswers;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -26,16 +38,15 @@ class QuizResultScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: [
-                    // Icon Cúp & Điểm số
                     const Icon(Icons.emoji_events, color: Colors.amber, size: 80),
                     const SizedBox(height: 10),
-                    const Text('8/10', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
+                    // Sử dụng dữ liệu động
+                    Text('${result.correctAnswers}/$totalQuestions', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                     const Text('Tuyệt vời!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
                     const SizedBox(height: 5),
                     const Text('Bạn đã hoàn thành bài kiểm tra.', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                     const SizedBox(height: 30),
 
-                    // Box Thống kê
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -47,11 +58,12 @@ class QuizResultScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('Đúng', '8', Colors.green),
+                          _buildStatItem('Đúng', '${result.correctAnswers}', Colors.green),
                           Container(width: 1, height: 40, color: Colors.grey.shade200),
-                          _buildStatItem('Sai', '2', Colors.red),
+                          _buildStatItem('Sai', '${result.wrongAnswers}', Colors.red),
                           Container(width: 1, height: 40, color: Colors.grey.shade200),
-                          _buildStatItem('Thời gian', '4 phút 32 giây', const Color(0xFF1E293B), isTime: true),
+                          // Sử dụng hàm format thời gian
+                          _buildStatItem('Thời gian', _formatTime(result.timeTakenSeconds), const Color(0xFF1E293B), isTime: true),
                         ],
                       ),
                     ),

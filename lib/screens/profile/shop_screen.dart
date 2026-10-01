@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/mock_data.dart';
 import '../../models/reward_item_model.dart';
+import '../../models/user_inventory_model.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({Key? key}) : super(key: key);
@@ -11,46 +12,58 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen> {
-  late List<RewardItem> items;
-  // Giả lập người dùng hiện tại đang Top 1
+  late List<RewardItem> shopItems;
   final int currentUserRank = 1;
 
   @override
   void initState() {
     super.initState();
-    items = MockData.shopItems;
+    shopItems = MockData.shopItems; // Lấy danh mục sản phẩm từ DB
+  }
+
+  // Hàm check xem user đã mua chưa
+  bool _isItemUnlocked(String itemId) {
+    return MockData.myInventory.any((inv) => inv.rewardItemId == itemId);
+  }
+
+  // Hàm check xem user có đang dùng không
+  bool _isItemEquipped(String itemId) {
+    return MockData.myInventory.any((inv) => inv.rewardItemId == itemId && inv.isEquipped);
   }
 
   void _unlockItem(RewardItem item) {
     if (item.requiredRank > 0 && currentUserRank > item.requiredRank) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Vật phẩm này yêu cầu bạn phải đạt Top ${item.requiredRank} Bảng xếp hạng!'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cần đạt Top ${item.requiredRank} Bảng xếp hạng!'), backgroundColor: Colors.red));
       return;
     }
-
-    // Trừ thẳng tiền vào user model global
     if (MockData.currentUser.currentXp >= item.xpCost) {
       setState(() {
         MockData.currentUser.currentXp -= item.xpCost;
-        item.isUnlocked = true;
+        // Thêm vật phẩm mới vào Kho đồ của User (Mô phỏng POST request)
+        MockData.myInventory.add(UserInventory(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            userId: MockData.currentUser.id,
+            rewardItemId: item.id,
+            isEquipped: false,
+            unlockedAt: DateTime.now()
+        ));
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã mở khóa: ${item.name}!'), backgroundColor: Colors.green),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Đã mua: ${item.name}!'), backgroundColor: Colors.green));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không đủ XP hiện tại! Hãy làm thêm thử thách.'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không đủ XP!'), backgroundColor: Colors.red));
     }
   }
 
   void _equipItem(RewardItem item) {
     setState(() {
-      for (var i in items) {
-        if (i.type == item.type) i.isEquipped = false;
+      // Bỏ trang bị tất cả đồ cùng loại (Mô phỏng PUT request)
+      for (var inv in MockData.myInventory) {
+        var shopItem = shopItems.firstWhere((s) => s.id == inv.rewardItemId);
+        if (shopItem.type == item.type) inv.isEquipped = false;
       }
-      item.isEquipped = true;
+      // Trang bị đồ mới
+      var targetInv = MockData.myInventory.firstWhere((inv) => inv.rewardItemId == item.id);
+      targetInv.isEquipped = true;
     });
   }
 
@@ -89,9 +102,9 @@ class _ShopScreenState extends State<ShopScreen> {
       body: GridView.builder(
         padding: const EdgeInsets.all(20),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 0.8),
-        itemCount: items.length,
+        itemCount: shopItems.length,
         itemBuilder: (context, index) {
-          final item = items[index];
+          final item = shopItems[index];
           List<Color> gradientColors = item.borderColors.map((hex) => Color(hex)).toList();
 
           return Container(
@@ -115,13 +128,13 @@ class _ShopScreenState extends State<ShopScreen> {
                 Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 15),
 
-                if (item.isEquipped)
+                if (_isItemEquipped(item.id))
                   OutlinedButton(
                     onPressed: () {},
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.green, side: const BorderSide(color: Colors.green), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                     child: const Text('Đang dùng', style: TextStyle(fontSize: 12)),
                   )
-                else if (item.isUnlocked)
+                else if (_isItemUnlocked(item.id))
                   ElevatedButton(
                     onPressed: () => _equipItem(item),
                     style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
