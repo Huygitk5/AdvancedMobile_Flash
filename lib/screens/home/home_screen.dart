@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/mock_data.dart'; // Bổ sung import dữ liệu
 import '../../widgets/reminder_dialog.dart';
 import '../vocabulary/topic_screen.dart';
 import '../flashcard/flashcard_screen.dart';
@@ -40,6 +41,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 15),
               _buildChallengeSection(context),
               const SizedBox(height: 25),
+
               _buildLeaderboardBanner(context),
               const SizedBox(height: 20),
             ],
@@ -50,21 +52,50 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    // Lấy thông tin user hiện tại
+    final user = MockData.currentUser;
+
+    // Hàm lấy màu viền đang được dùng từ Shop
+    List<Color> getEquippedBorderColors() {
+      final equipped = MockData.shopItems.firstWhere(
+            (item) => item.isEquipped && item.type == 'border',
+        orElse: () => MockData.shopItems[0],
+      );
+      return equipped.borderColors.map((hex) => Color(hex)).toList();
+    }
+
     return Column(
       children: [
         Row(
           children: [
-            const CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.blueAccent,
-              child: Icon(Icons.person, color: Colors.white),
+            // Thay thế CircleAvatar cũ bằng Avatar có viền Gradient
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: getEquippedBorderColors(),
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFFEEF2FF),
+                  child: Icon(Icons.person, color: AppTheme.primaryColor),
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                Text('Huy 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              children: [
+                const Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                // Sử dụng fullName từ dữ liệu động
+                Text('${user.fullName} 👋', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
               ],
             ),
             const Spacer(),
@@ -102,9 +133,10 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(width: 6),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('7 ngày', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
-                      Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                    children: [
+                      // Lấy số ngày streak từ dữ liệu động
+                      Text('${user.streakDays} ngày', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
+                      const Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
                     ],
                   ),
                   const SizedBox(width: 4),
@@ -248,7 +280,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Thêm tham số context và gán hàm onTap điều hướng
   Widget _buildSuggestedLessons(BuildContext context) {
     return SizedBox(
       height: 220,
@@ -275,7 +306,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Bổ sung GestureDetector và tham số VoidCallback onTap
   Widget _buildLessonCard(String title, String level, double progress, String data1, String data2, Color imageBg, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -387,7 +417,6 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () {
-              // Gọi hàm chuyển tab (Tab Thử thách ở vị trí số 3) thay vì Push đè trang mới
               if (onSwitchTab != null) {
                 onSwitchTab!(3);
               } else {
@@ -442,7 +471,7 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
-                    'Bảng Xếp Hạng Top 50',
+                    'Top 10 Vinh Danh',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   SizedBox(height: 4),
