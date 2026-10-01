@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/mock_data.dart';
 import '../../models/topic_model.dart';
+import '../../models/grammar_model.dart';
 import '../flashcard/flashcard_screen.dart';
 import '../grammar/grammar_detail_screen.dart';
 
@@ -37,21 +38,15 @@ class _TopicScreenState extends State<TopicScreen> {
     }).toList();
   }
 
-  // Hàm xử lý logic lọc Ngữ pháp
-  List<Map<String, dynamic>> get filteredGrammar {
+  List<Grammar> get filteredGrammar {
     return MockData.grammarTopics.where((grammar) {
-      // 1. Lọc theo tên (Search)
-      bool matchSearch = grammar['title'].toString().toLowerCase().contains(searchQuery.toLowerCase());
-
-      // 2. Lọc theo trạng thái (Filter Chips)
+      bool matchSearch = grammar.title.toLowerCase().contains(searchQuery.toLowerCase());
       bool matchFilter = true;
-      double progress = grammar['progress'];
       if (selectedFilter == 'Đang học') {
-        matchFilter = progress > 0 && progress < 1.0;
-      } else if (selectedFilter == 'Đã hoàn thành') {
-        matchFilter = progress >= 1.0;
+        matchFilter = grammar.progress > 0 && grammar.progress < 1.0;
+      } else if (selectedFilter == 'Hoàn thành') {
+        matchFilter = grammar.progress >= 1.0;
       }
-
       return matchSearch && matchFilter;
     }).toList();
   }
@@ -261,52 +256,46 @@ class _TopicScreenState extends State<TopicScreen> {
     );
   }
 
-  Widget _buildGrammarCard(BuildContext context, Map<String, dynamic> grammar) {
-    double progress = grammar['progress'];
+  Widget _buildGrammarCard(BuildContext context, Grammar grammar) {
+    double progress = grammar.progress;
     Color iconBgColor = progress == 1.0 ? Colors.green.shade400 : (progress > 0 ? Colors.deepPurple.shade400 : Colors.blue.shade300);
     Color statusColor = progress == 1.0 ? Colors.green : AppTheme.greyColor;
 
-    Widget trailingIcon;
-    if (progress == 1.0) {
-      trailingIcon = const Icon(Icons.check_circle, color: Colors.green, size: 28);
-    } else if (progress > 0) {
-      trailingIcon = Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.blueAccent, width: 2.5)));
-    } else {
-      trailingIcon = Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300, width: 2.5)));
+    Widget trailingIcon = progress == 1.0
+        ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
+        : Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: progress > 0 ? Colors.blueAccent : Colors.grey.shade300, width: 2.5)));
+
+    // Map string từ API sang Icon Flutter
+    IconData getIcon(String name) {
+      switch (name) {
+        case 'access_alarm': return Icons.access_alarm;
+        case 'history_edu': return Icons.history_edu;
+        case 'verified_user': return Icons.verified_user_outlined;
+        case 'alt_route': return Icons.alt_route;
+        default: return Icons.account_tree_outlined;
+      }
     }
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GrammarDetailScreen(title: grammar['title']),
-          ),
-        );
-      },
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: grammar.title))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))],
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))]),
         child: Row(
           children: [
             Container(
-              width: 50, height: 50,
-              decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(grammar['icon'], color: Colors.white, size: 26),
+              width: 50, height: 50, decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(12)),
+              child: Icon(getIcon(grammar.iconName), color: Colors.white, size: 26),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(grammar['title'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                  Text(grammar.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
                   const SizedBox(height: 5),
-                  Text(grammar['status'], style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w500)),
+                  Text(grammar.status, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),

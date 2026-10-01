@@ -3,16 +3,41 @@ import '../models/topic_model.dart';
 import '../models/flashcard_model.dart';
 import '../models/quest_model.dart';
 import '../models/reward_item_model.dart';
-import '../models/leaderboard_user_model.dart';
 import '../models/user_model.dart';
+import '../models/grammar_model.dart';
+import '../models/quiz_result_model.dart';
+import '../models/daily_statistic_model.dart';
+import '../models/user_inventory_model.dart';
+import '../models/lesson_model.dart';
+import '../models/quiz_review_model.dart';
 
 class MockData {
   static List<Topic> vocabularyTopics = [
-    Topic(id: 't1', title: 'Daily Life', totalWords: 25, progress: 0.6, iconPath: '☀️'),
-    Topic(id: 't2', title: 'Travel', totalWords: 30, progress: 0.3, iconPath: '✈️'),
-    Topic(id: 't3', title: 'Food & Drink', totalWords: 25, progress: 0.2, iconPath: '🍔'),
-    Topic(id: 't4', title: 'Technology', totalWords: 30, progress: 0.1, iconPath: '💻'),
-    Topic(id: 't5', title: 'Business', totalWords: 25, progress: 0.0, iconPath: '💼'),
+    Topic(id: 't1',
+        title: 'Daily Life',
+        totalWords: 25,
+        progress: 0.6,
+        iconPath: '☀️'),
+    Topic(id: 't2',
+        title: 'Travel',
+        totalWords: 30,
+        progress: 0.3,
+        iconPath: '✈️'),
+    Topic(id: 't3',
+        title: 'Food & Drink',
+        totalWords: 25,
+        progress: 0.2,
+        iconPath: '🍔'),
+    Topic(id: 't4',
+        title: 'Technology',
+        totalWords: 30,
+        progress: 0.1,
+        iconPath: '💻'),
+    Topic(id: 't5',
+        title: 'Business',
+        totalWords: 25,
+        progress: 0.0,
+        iconPath: '💼'),
   ];
 
   static List<UserModel> users = [
@@ -63,42 +88,32 @@ class MockData {
   // Hàm tiện ích lấy User đang đăng nhập (Tài khoản của bạn)
   static UserModel get currentUser => users.firstWhere((u) => u.id == 'u1');
 
-  static List<Map<String, dynamic>> grammarTopics = [
-    {
-      'id': 'g1',
-      'title': 'Present Simple',
-      'progress': 1.0,
-      'status': 'Đã học 100%',
-      'icon': Icons.account_tree_outlined,
-    },
-    {
-      'id': 'g2',
-      'title': 'Present Continuous',
-      'progress': 0.6,
-      'status': 'Đang học 60%',
-      'icon': Icons.access_alarm,
-    },
-    {
-      'id': 'g3',
-      'title': 'Past Simple',
-      'progress': 0.0,
-      'status': 'Chưa học 0%',
-      'icon': Icons.history_edu,
-    },
-    {
-      'id': 'g4',
-      'title': 'Present Perfect',
-      'progress': 0.0,
-      'status': 'Chưa học 0%',
-      'icon': Icons.verified_user_outlined,
-    },
-    {
-      'id': 'g5',
-      'title': 'Conditional',
-      'progress': 0.0,
-      'status': 'Chưa học 0%',
-      'icon': Icons.alt_route,
-    },
+  static List<Grammar> grammarTopics = [
+    Grammar(id: 'g1',
+        title: 'Present Simple',
+        progress: 1.0,
+        status: 'Đã học 100%',
+        iconName: 'account_tree'),
+    Grammar(id: 'g2',
+        title: 'Present Continuous',
+        progress: 0.6,
+        status: 'Đang học 60%',
+        iconName: 'access_alarm'),
+    Grammar(id: 'g3',
+        title: 'Past Simple',
+        progress: 0.0,
+        status: 'Chưa học 0%',
+        iconName: 'history_edu'),
+    Grammar(id: 'g4',
+        title: 'Present Perfect',
+        progress: 0.0,
+        status: 'Chưa học 0%',
+        iconName: 'verified_user'),
+    Grammar(id: 'g5',
+        title: 'Conditional',
+        progress: 0.0,
+        status: 'Chưa học 0%',
+        iconName: 'alt_route'),
   ];
 
   static List<Flashcard> flashcards = [
@@ -154,26 +169,28 @@ class MockData {
     ),
   ];
 
-  // 1. Dữ liệu Bảng xếp hạng (Hơn 10 người để test)
-  static List<LeaderboardUser> leaderboardUsers = [
-    LeaderboardUser(id: 'u1', name: 'Đoàn Quốc Huy', totalLifetimeXp: 3500, longestStreak: 45, note: 'Kẻ hủy diệt từ vựng! 🔥'),
-    LeaderboardUser(id: 'u2', name: 'Nguyễn Văn A', totalLifetimeXp: 3200, longestStreak: 30, note: 'Chăm chỉ mỗi ngày 📚'),
-    LeaderboardUser(id: 'u3', name: 'Trần Thị B', totalLifetimeXp: 2800, longestStreak: 50, note: 'Chúa tể ngữ pháp 👑'),
-    LeaderboardUser(id: 'u4', name: 'Lê Hoàng C', totalLifetimeXp: 2500, longestStreak: 14, note: 'Đang tăng tốc... 🚀'),
-    LeaderboardUser(id: 'u5', name: 'Phạm Thị D', totalLifetimeXp: 2100, longestStreak: 21, note: 'Không bỏ cuộc 💪'),
-    LeaderboardUser(id: 'u6', name: 'Vũ Đức E', totalLifetimeXp: 1800, longestStreak: 10, note: 'Mới nhú 🌱'),
-    LeaderboardUser(id: 'u7', name: 'Hoàng Văn F', totalLifetimeXp: 1500, longestStreak: 7, note: 'Cần cố gắng hơn 🎯'),
-    LeaderboardUser(id: 'u8', name: 'Lý Tiểu G', totalLifetimeXp: 1400, longestStreak: 6, note: 'Tà tà kiếm cơm'),
-    LeaderboardUser(id: 'u9', name: 'Vương Đại H', totalLifetimeXp: 1200, longestStreak: 5, note: 'Newbie'),
-    LeaderboardUser(id: 'u10', name: 'Đinh Tốc I', totalLifetimeXp: 1100, longestStreak: 4, note: 'Học vẹt'),
-    LeaderboardUser(id: 'u11', name: 'Người Bị Loại K', totalLifetimeXp: 500, longestStreak: 2, note: 'Sẽ không hiện lên top 10'),
-  ];
-
   // 2. Dữ liệu Shop (Có item yêu cầu Top)
   static List<RewardItem> shopItems = [
-    RewardItem(id: 'b1', name: 'Tân binh', type: 'border', xpCost: 0, borderColors: [0xFFE2E8F0, 0xFFCBD5E1], isUnlocked: true, isEquipped: false),
-    RewardItem(id: 'b2', name: 'Hỏa thần', type: 'border', xpCost: 500, borderColors: [0xFFFF4D4F, 0xFFFF7A45, 0xFFFFA940], isUnlocked: true, isEquipped: true),
-    RewardItem(id: 'b3', name: 'Tinh tú', type: 'border', xpCost: 1500, borderColors: [0xFF722ED1, 0xFFB37FEB, 0xFF531DAB], isUnlocked: false),
+    RewardItem(id: 'b1',
+        name: 'Tân binh',
+        type: 'border',
+        xpCost: 0,
+        borderColors: [0xFFE2E8F0, 0xFFCBD5E1],
+        isUnlocked: true,
+        isEquipped: false),
+    RewardItem(id: 'b2',
+        name: 'Hỏa thần',
+        type: 'border',
+        xpCost: 500,
+        borderColors: [0xFFFF4D4F, 0xFFFF7A45, 0xFFFFA940],
+        isUnlocked: true,
+        isEquipped: true),
+    RewardItem(id: 'b3',
+        name: 'Tinh tú',
+        type: 'border',
+        xpCost: 1500,
+        borderColors: [0xFF722ED1, 0xFFB37FEB, 0xFF531DAB],
+        isUnlocked: false),
     // Item VIP yêu cầu lọt Top 3
     RewardItem(
         id: 'b4',
@@ -181,8 +198,126 @@ class MockData {
         type: 'border',
         xpCost: 3000,
         borderColors: [0xFFFAAD14, 0xFFFFE58F, 0xFFFA8C16],
-        requiredRank: 3, // Bổ sung điều kiện
+        requiredRank: 3,
+        // Bổ sung điều kiện
         isUnlocked: false
+    ),
+  ];
+
+  static QuizResult latestQuizResult = QuizResult(
+    id: 'qr1',
+    userId: 'u1',
+    topicId: 't1',
+    correctAnswers: 8,
+    wrongAnswers: 2,
+    timeTakenSeconds: 272,
+    // 4 phút 32 giây
+    wrongQuestionIds: ['q2', 'q5'],
+  );
+
+  static List<DailyStatistic> weeklyStats = [
+    DailyStatistic(id: 's1',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 6)),
+        wordsLearned: 15,
+        xpGained: 50),
+    DailyStatistic(id: 's2',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 5)),
+        wordsLearned: 40,
+        xpGained: 120),
+    DailyStatistic(id: 's3',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 4)),
+        wordsLearned: 25,
+        xpGained: 80),
+    DailyStatistic(id: 's4',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 3)),
+        wordsLearned: 60,
+        xpGained: 200),
+    DailyStatistic(id: 's5',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 2)),
+        wordsLearned: 10,
+        xpGained: 30),
+    DailyStatistic(id: 's6',
+        userId: 'u1',
+        date: DateTime.now().subtract(const Duration(days: 1)),
+        wordsLearned: 45,
+        xpGained: 150),
+    DailyStatistic(id: 's7',
+        userId: 'u1',
+        date: DateTime.now(),
+        wordsLearned: 80,
+        xpGained: 250), // Hôm nay
+  ];
+
+  // Tủ đồ của người dùng hiện tại (Ví dụ đã sở hữu 2 viền, đang dùng viền b2)
+  static List<UserInventory> myInventory = [
+    UserInventory(id: 'inv1',
+        userId: 'u1',
+        rewardItemId: 'b1',
+        isEquipped: false,
+        unlockedAt: DateTime.now()),
+    UserInventory(id: 'inv2',
+        userId: 'u1',
+        rewardItemId: 'b2',
+        isEquipped: true,
+        unlockedAt: DateTime.now()),
+  ];
+
+  static List<Lesson> suggestedLessons = [
+    Lesson(id: 'ls1',
+        title: 'Travel Vocabulary',
+        type: 'vocabulary',
+        level: 'A2',
+        progress: 0.6,
+        itemCounts: '20 từ',
+        estimatedTime: '8 phút',
+        imageBg: Colors.blue.shade100),
+    Lesson(id: 'ls2',
+        title: 'Present Simple',
+        type: 'grammar',
+        level: 'A2',
+        progress: 0.4,
+        itemCounts: '3 bài',
+        estimatedTime: '12 phút',
+        imageBg: Colors.purple.shade100),
+    Lesson(id: 'ls3',
+        title: 'Daily Conversation',
+        type: 'vocabulary',
+        level: 'B1',
+        progress: 0.2,
+        itemCounts: '15 câu',
+        estimatedTime: '10 phút',
+        imageBg: Colors.orange.shade100),
+  ];
+
+  static List<QuizReviewItem> mockReviewData = [
+    QuizReviewItem(
+      id: 'q1',
+      question: 'She ______ her homework now.',
+      options: ['is doing', 'does', 'did', 'was doing'],
+      correctIndex: 0,
+      userIndex: 0,
+      explanation: 'Câu ở thì hiện tại tiếp diễn, nên dùng "is doing".',
+    ),
+    QuizReviewItem(
+      id: 'q2',
+      question: 'The weather is very ______ today.',
+      options: ['good', 'well', 'bad', 'nice'],
+      correctIndex: 3,
+      userIndex: 0,
+      explanation: 'Sau "is" (thời tiết) ta dùng tính từ, nên đáp án đúng là "nice".',
+    ),
+    QuizReviewItem(
+      id: 'q5',
+      question: 'I ______ to the store yesterday.',
+      options: ['went', 'go', 'goes', 'going'],
+      correctIndex: 0,
+      userIndex: 0,
+      explanation: 'Câu ở thì quá khứ đơn, dấu hiệu "yesterday" nên dùng "went".',
     ),
   ];
 }

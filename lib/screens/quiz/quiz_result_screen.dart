@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../models/quiz_result_model.dart';
+import 'quiz_review_screen.dart'; // Import màn hình mới
 
 class QuizResultScreen extends StatelessWidget {
-  const QuizResultScreen({Key? key}) : super(key: key);
+  final QuizResult result;
+
+  const QuizResultScreen({Key? key, required this.result}) : super(key: key);
+
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '$minutes phút $remainingSeconds giây';
+  }
 
   @override
   Widget build(BuildContext context) {
+    int totalQuestions = result.correctAnswers + result.wrongAnswers;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -26,16 +38,14 @@ class QuizResultScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: [
-                    // Icon Cúp & Điểm số
                     const Icon(Icons.emoji_events, color: Colors.amber, size: 80),
                     const SizedBox(height: 10),
-                    const Text('8/10', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
+                    Text('${result.correctAnswers}/$totalQuestions', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                     const Text('Tuyệt vời!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
                     const SizedBox(height: 5),
                     const Text('Bạn đã hoàn thành bài kiểm tra.', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                     const SizedBox(height: 30),
 
-                    // Box Thống kê
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -47,54 +57,18 @@ class QuizResultScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('Đúng', '8', Colors.green),
+                          _buildStatItem('Đúng', '${result.correctAnswers}', Colors.green),
                           Container(width: 1, height: 40, color: Colors.grey.shade200),
-                          _buildStatItem('Sai', '2', Colors.red),
+                          _buildStatItem('Sai', '${result.wrongAnswers}', Colors.red),
                           Container(width: 1, height: 40, color: Colors.grey.shade200),
-                          _buildStatItem('Thời gian', '4 phút 32 giây', const Color(0xFF1E293B), isTime: true),
+                          _buildStatItem('Thời gian', _formatTime(result.timeTakenSeconds), const Color(0xFF1E293B), isTime: true),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 30),
-
-                    // Danh sách Câu sai
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1F0), // Nền đỏ nhạt
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
-                              SizedBox(width: 8),
-                              Text('Câu sai', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 16)),
-                            ],
-                          ),
-                          const SizedBox(height: 15),
-                          const Text('2. The weather is very ______ today.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          const SizedBox(height: 10),
-                          const Text('A. good', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(10)),
-                            child: const Text('B. well', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('C. bad', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                          const Text('D. nice', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                        ],
-                      ),
-                    )
                   ],
                 ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: SizedBox(
@@ -105,7 +79,13 @@ class QuizResultScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    // Chuyển sang màn hình xem chi tiết
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => QuizReviewScreen(result: result)),
+                    );
+                  },
                   child: const Text('Xem chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),

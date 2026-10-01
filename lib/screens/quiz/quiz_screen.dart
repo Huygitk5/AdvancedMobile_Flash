@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import 'quiz_result_screen.dart';
+import '../../data/mock_data.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({Key? key}) : super(key: key);
@@ -123,7 +124,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                   onPressed: selectedOptionIndex == null ? null : () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const QuizResultScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => QuizResultScreen(result: MockData.latestQuizResult))
+                    );
                   },
                   child: const Text('Kiểm tra', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),

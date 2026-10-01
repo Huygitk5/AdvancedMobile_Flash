@@ -286,22 +286,26 @@ class HomeScreen extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
-        children: [
-          _buildLessonCard(
-            'Travel Vocabulary', 'A2', 0.6, '20 từ', '8 phút', Colors.blue.shade100,
-                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Travel Vocabulary'))),
-          ),
-          const SizedBox(width: 15),
-          _buildLessonCard(
-            'Present Simple', 'A2', 0.4, '3 bài', '12 phút', Colors.purple.shade100,
-                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GrammarDetailScreen(title: 'Present Simple'))),
-          ),
-          const SizedBox(width: 15),
-          _buildLessonCard(
-            'Daily Conversation', 'B1', 0.2, '15 câu', '10 phút', Colors.orange.shade100,
-                () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Daily Conversation'))),
-          ),
-        ],
+        children: MockData.suggestedLessons.map((lesson) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 15.0),
+            child: _buildLessonCard(
+                lesson.title,
+                lesson.level,
+                lesson.progress,
+                lesson.itemCounts,
+                lesson.estimatedTime,
+                lesson.imageBg,
+                    () {
+                      if (lesson.type == 'vocabulary') {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: lesson.title)));
+                      } else if (lesson.type == 'grammar') {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: lesson.title)));
+                      }
+                }
+            ),
+          );
+        }).toList(),
       ),
     );
   }
