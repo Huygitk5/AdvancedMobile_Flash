@@ -61,6 +61,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(

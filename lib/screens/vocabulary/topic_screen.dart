@@ -94,7 +94,7 @@ class _TopicScreenState extends State<TopicScreen> {
           child: list.isEmpty
               ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
               : ListView.builder(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
             itemCount: list.length,
             itemBuilder: (context, index) {
               return _buildVocabularyCard(context, list[index]);
@@ -116,8 +116,7 @@ class _TopicScreenState extends State<TopicScreen> {
           child: list.isEmpty
               ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
               : ListView.builder(
-            padding: const EdgeInsets.all(20.0),
-            itemCount: list.length,
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),            itemCount: list.length,
             itemBuilder: (context, index) {
               return _buildGrammarCard(context, list[index]);
             },

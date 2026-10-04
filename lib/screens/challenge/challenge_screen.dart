@@ -67,7 +67,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
         children: [
           // Thẻ tổng quan XP
           Container(
