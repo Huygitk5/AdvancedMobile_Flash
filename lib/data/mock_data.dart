@@ -54,6 +54,7 @@ class MockData {
       totalLifetimeXp: 3500,
       longestStreak: 45,
       slogan: 'Kẻ hủy diệt từ vựng! 🔥',
+      role: 'USER'
     ),
     UserModel(
       id: 'u2',
@@ -68,6 +69,7 @@ class MockData {
       totalLifetimeXp: 3200,
       longestStreak: 30,
       slogan: 'Chăm chỉ mỗi ngày 📚',
+      role: 'USER'
     ),
     UserModel(
       id: 'u3',
@@ -82,6 +84,7 @@ class MockData {
       totalLifetimeXp: 2800,
       longestStreak: 50,
       slogan: 'Chúa tể ngữ pháp 👑',
+      role: 'USER'
     ),
   ];
 

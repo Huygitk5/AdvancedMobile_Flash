@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
-import '../quiz/quiz_screen.dart'; // Chuyển sang màn bài tập
+import '../quiz/quiz_screen.dart';
 
 class GrammarDetailScreen extends StatelessWidget {
   final String title;
@@ -9,16 +9,30 @@ class GrammarDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dữ liệu giả lập linh động theo Tên bài ngữ pháp
+    String structure = title.contains('Continuous') ? 'S + am/is/are + V-ing' : 'S + V(s/es) + O';
+    String explanation = title.contains('Continuous')
+        ? 'Dùng để diễn tả một hành động đang xảy ra tại thời điểm nói hoặc xung quanh thời điểm nói.'
+        : 'Dùng để diễn tả một thói quen, một sự thật hiển nhiên hoặc một lịch trình cố định.';
+
+    List<Map<String, String>> examples = title.contains('Continuous')
+        ? [
+      {'en': 'I am studying English.', 'vi': 'Tôi đang học tiếng Anh.'},
+      {'en': 'She is working now.', 'vi': 'Cô ấy đang làm việc bây giờ.'},
+    ]
+        : [
+      {'en': 'I play football every weekend.', 'vi': 'Tôi chơi bóng đá mỗi cuối tuần.'},
+      {'en': 'The sun rises in the East.', 'vi': 'Mặt trời mọc ở hướng Đông.'},
+    ];
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20),
+          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(title, style: const TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text(title, style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -39,7 +53,7 @@ class GrammarDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text('1/5', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                  Text('1/5', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                 ],
               ),
             ),
@@ -51,13 +65,11 @@ class GrammarDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Present Continuous', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
-                    const SizedBox(height: 5),
-                    const Text('(Hiện tại tiếp diễn)', style: TextStyle(fontSize: 16, color: AppTheme.greyColor)),
+                    Text(title, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
                     const SizedBox(height: 20),
-                    const Text(
-                      'Dùng để diễn tả hành động đang xảy ra ở hiện tại, hành động sắp xảy ra hoặc một hành động tạm thời.',
-                      style: TextStyle(fontSize: 16, height: 1.5, color: Color(0xFF1E293B)),
+                    Text(
+                      explanation,
+                      style: TextStyle(fontSize: 16, height: 1.5, ),
                     ),
                     const SizedBox(height: 25),
 
@@ -77,9 +89,9 @@ class GrammarDetailScreen extends StatelessWidget {
                         color: const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Text(
-                          'S + am/is/are + V-ing',
+                          structure,
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.primaryColor),
                         ),
                       ),
@@ -95,9 +107,7 @@ class GrammarDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 15),
-                    _buildExampleItem('I am studying English.', 'Tôi đang học tiếng Anh.'),
-                    _buildExampleItem('She is working now.', 'Cô ấy đang làm việc bây giờ.'),
-                    _buildExampleItem('They are playing football.', 'Họ đang chơi bóng đá.'),
+                    ...examples.map((ex) => _buildExampleItem(ex['en']!, ex['vi']!)).toList(),
                   ],
                 ),
               ),
@@ -117,7 +127,7 @@ class GrammarDetailScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const QuizScreen()));
                   },
-                  child: const Text('Tiếp theo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text('Tiếp theo (Kiểm tra)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
                 ),
               ),
             ),
@@ -135,15 +145,15 @@ class GrammarDetailScreen extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 8.0, right: 10.0),
-            child: CircleAvatar(radius: 3, backgroundColor: Color(0xFF1E293B)),
+            child: CircleAvatar(radius: 3, backgroundColor: const Color(0xFF1E293B)),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(en, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B))),
+                Text(en, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, )),
                 const SizedBox(height: 4),
-                Text(vi, style: const TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                Text(vi, style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
               ],
             ),
           )

@@ -40,11 +40,11 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.stars, color: Colors.amber),
+            Icon(Icons.stars, color: Colors.amber),
             const SizedBox(width: 10),
             Text(
               'Tuyệt vời! Bạn nhận được +${quests[index].xp} XP',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ],
         ),
@@ -60,16 +60,14 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F6FA),
         elevation: 0,
-        title: const Text('Thử thách', style: TextStyle(color: Color(0xFF1E293B), fontSize: 22, fontWeight: FontWeight.bold)),
+        title: Text('Thử thách', style: TextStyle( fontSize: 22, fontWeight: FontWeight.bold)),
         centerTitle: false,
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
         children: [
           // Thẻ tổng quan XP
           Container(
@@ -89,8 +87,8 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                  child: const Icon(Icons.stars, color: Colors.amber, size: 40),
+                  decoration: BoxDecoration(color: Theme.of(context).cardColor.withOpacity(0.2), shape: BoxShape.circle),
+                  child: Icon(Icons.stars, color: Colors.amber, size: 40),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -118,7 +116,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
           ),
           const SizedBox(height: 30),
 
-          const Text('Nhiệm vụ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          Text('Nhiệm vụ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, )),
           const SizedBox(height: 15),
 
           // Render danh sách nhiệm vụ từ biến state truyền trực tiếp object Quest
@@ -176,7 +174,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                     )
                 ),
                 const SizedBox(height: 5),
-                Text('+${quest.xp} XP', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('+${quest.xp} XP', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 10),
                 LinearProgressIndicator(
                   value: progress,
@@ -194,24 +192,24 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
             duration: const Duration(milliseconds: 300),
             transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child)),
             child: quest.isClaimed
-                ? const Icon(Icons.check_circle, color: Colors.green, size: 32, key: ValueKey('claimed'))
+                ? Icon(Icons.check_circle, color: Colors.green, size: 32, key: ValueKey('claimed'))
                 : (isCompleted
                 ? ElevatedButton(
               key: const ValueKey('claim_btn'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).cardColor,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               onPressed: () => _claimReward(index),
-              child: const Text('Nhận', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Nhận', style: TextStyle(fontWeight: FontWeight.bold)),
             )
                 : Text(
                 '${quest.current}/${quest.target}',
                 key: const ValueKey('progress_text'),
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 14)
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 14)
             )
             ),
           ),
