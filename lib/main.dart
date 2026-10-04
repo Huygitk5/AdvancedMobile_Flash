@@ -1,7 +1,5 @@
-import 'package:flash/screens/splash/welcome_screen.dart';
 import 'package:flutter/material.dart';
 import 'core/theme.dart';
-import 'screens/main/main_screen.dart';
 import 'screens/splash/welcome_screen.dart';
 
 void main() {
@@ -13,11 +11,19 @@ class FlashApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flash English',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      home: const WelcomeScreen(), // Bỏ qua Welcome để test nhanh UI chính
+    // Lắng nghe sự thay đổi của themeNotifier
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp(
+          title: 'Flash English',
+          theme: AppTheme.lightTheme,      // Cấu hình Sáng
+          darkTheme: AppTheme.darkTheme,   // Cấu hình Tối
+          themeMode: currentMode,          // Chế độ hiện tại
+          debugShowCheckedModeBanner: false,
+          home: const WelcomeScreen(),
+        );
+      },
     );
   }
 }

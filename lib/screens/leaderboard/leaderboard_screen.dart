@@ -33,12 +33,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F6FA),
         appBar: AppBar(
-          backgroundColor: Colors.white,
           elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20), onPressed: () => Navigator.pop(context)),
-          title: const Text('Top 10 Vinh Danh', style: TextStyle(color: Color(0xFF1E293B), fontSize: 20, fontWeight: FontWeight.bold)),
+          leading: IconButton(icon: Icon(Icons.arrow_back_ios_new,  size: 20), onPressed: () => Navigator.pop(context)),
+          title: Text('Top 10 Vinh Danh', style: TextStyle( fontSize: 20, fontWeight: FontWeight.bold)),
           centerTitle: true,
           bottom: const TabBar(
             labelColor: AppTheme.primaryColor,
@@ -70,7 +68,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           margin: const EdgeInsets.only(bottom: 15),
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             border: rank <= 3 ? Border.all(color: _getRankColor(rank), width: 2.0) : null,
             boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
@@ -81,7 +79,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 width: 30,
                 child: rank <= 3
                     ? Icon(Icons.emoji_events, color: _getRankColor(rank), size: 28)
-                    : Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 16)),
+                    : Text('#$rank', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 16)),
               ),
               const SizedBox(width: 15),
               CircleAvatar(
@@ -96,9 +94,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Hiển thị fullName và slogan
-                    Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(user.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, ), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text(user.slogan, style: const TextStyle(color: AppTheme.greyColor, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(user.slogan, style: TextStyle(color: AppTheme.greyColor, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -110,7 +108,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     isXp ? '${user.totalLifetimeXp}' : '${user.longestStreak}',
                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600),
                   ),
-                  Text(isXp ? 'Point' : 'Ngày', style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text(isXp ? 'Point' : 'Ngày', style: TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               )
             ],
