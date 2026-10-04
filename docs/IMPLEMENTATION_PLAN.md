@@ -168,10 +168,23 @@ Làm theo thứ tự, vì các service sau gọi service trước.
 | 9 | `LeaderboardService` | Top N từ view, `myRank` bằng query `COUNT`, `@Cacheable` 60 giây. | view `v_leaderboard_*` |
 | 10 | `StatsService` | `/v1/users/me/statistics?range=`, accuracy = correct/total. | `daily_statistics` |
 
-- [ ] Viết controller cho các endpoint ghi ở §6.5–§6.10 gọi các service trên.
-- [ ] Unit test cho 1, 2, 3, 8 (đây là chỗ dễ sai và dễ bị gian lận nhất).
+- [x] Viết controller cho các endpoint ghi ở §6.5–§6.10 gọi các service trên.
+- [x] Unit test cho 1, 2, 3, 8 (đây là chỗ dễ sai và dễ bị gian lận nhất).
 
-**DoD:** Test chứng minh được: gửi cùng một review 2 lần chỉ cộng XP 1 lần; streak đúng qua ranh giới ngày theo timezone; mua đồ khi thiếu XP → 409, chưa đủ hạng → 403; claim quest chưa xong → 422.
+**DoD:** Test chứng minh được: gửi cùng một review 2 lần chỉ cộng XP 1 lần; streak đúng qua ranh giới ngày theo timezone; mua đồ khi thiếu XP → 409, chưa đủ hạng → 403; claim quest chưa xong → 422. ✅ *Đạt: 23 unit test (`XpServiceTest`, `StreakServiceTest`, `SrsReplayTest`, `ShopServiceTest`) + 11 test tích hợp (`GamificationIntegrationTest`); tổng 59 test đều qua.*
+
+*Ghi chú khi làm:*
+- **Khoá:** mọi thao tác đổi XP / streak / thống kê / nhiệm vụ / kho đồ bắt đầu bằng `UserService.lockActiveUser` (`SELECT ... FOR UPDATE` trên `users`), nên request song song của cùng user chạy tuần tự. Nhờ vậy `XpService` kiểm tra "đã có dòng ledger chưa" rồi mới INSERT thay vì bắt `DuplicateKeyException` (lỗi flush làm hỏng persistence context); `UNIQUE(user_id, source_type, source_id)` chỉ còn là chốt chặn cuối.
+- **`source_id` của ledger:** `know:<flashcardId>:<ngày>` (Know lần đầu trong ngày, giới hạn 300 XP/ngày bằng `LIKE 'know:%:<ngày>'`), `learned:<flashcardId>` (+5 một lần duy nhất), `quiz:<quizId>:<ngày>` (lần làm đầu trong ngày), id bài học, id `user_quests`, id `user_inventories` (mua đồ, số âm).
+- **Sự kiện ngoài `[now − 7 ngày, now + 5 phút]`:** vẫn lưu và tính SRS / tiến độ, nhưng không cộng XP, không tính streak, không vào `daily_statistics`. Review cùng thẻ cách < 1 giây hoặc > 60 review/phút: lưu nhưng không cộng XP.
+- **SRS:** phát lại **toàn bộ** log của (user, thẻ) mỗi lần nhận log mới (vài chục dòng), ghi lại `box_before/box_after` của các log bị log đến muộn chen vào. `is_learned = box ≥ 3` (có thể rớt lại nếu log AGAIN đến muộn); `learned_words` / `total_words_learned` luôn đếm lại, không +1/−1.
+- **Quest:** `LEARN_WORDS` = ôn một thẻ **lần đầu tiên** (mục tiêu "Học 20 flashcard mới"/ngày không đạt được nếu phải lên box 3). `KEEP_STREAK` +1 khi có hoạt động đầu tiên của ngày. Nhiệm vụ được giao khi gọi `/v1/quests/today` **hoặc** khi có sự kiện học của hôm nay; sự kiện offline của ngày cũ chỉ cập nhật nhiệm vụ đã giao cho ngày đó. `ONE_TIME` dùng `period_start = 1970-01-01`.
+- **Ngữ pháp:** hoàn thành bài đọc → `COMPLETED` nếu chủ điểm không có quiz, ngược lại `IN_PROGRESS` + `progress ≥ 0.5`; qua quiz (`score ≥ pass_score_percent`) → `COMPLETED`.
+- **Quiz:** phải trả lời (hoặc `null` = bỏ qua) đúng mỗi câu **hiện có** của đề; đề đã bị admin sửa khi client offline → 422 (client bỏ op). `wrongAnswers` gồm cả câu bỏ qua.
+- **Shop:** `Idempotency-Key` được ghi vào `sync_operations` (`op_type = SHOP_PURCHASE`); gửi lại cùng key trả lại đúng kết quả cũ thay vì 409 `ALREADY_OWNED`. Thứ tự kiểm tra: không hoạt động (404) → đã sở hữu (409) → hạng (403) → XP (409).
+- **Leaderboard:** cache top N 60 giây bằng map trong bộ nhớ (không thêm Caffeine); `me` luôn tính mới bằng `COUNT(*) + 1` (khớp `RANK()`).
+- **Thống kê:** `accuracy` chỉ tính từ câu trả lời quiz. `streakDays` ở `/statistics` là streak **hiện tại** (về 0 nếu đã bỏ lỡ quá 1 ngày); `/v1/users/me` và Home vẫn trả `users.streak_days` đã lưu.
+- **API thêm ngoài §6:** response ghi trả kèm `user` snapshot (`currentXp`, `totalLifetimeXp`, `streakDays`, …) để client ghi đè bản lạc quan; `duplicate: true` khi id đã được xử lý. `POST /v1/lessons/complete` trả 200 khi trùng id. `PUT /v1/shop/equip|unequip` trả `{inventory, unequipped[], resolution}`.
 
 ---
 

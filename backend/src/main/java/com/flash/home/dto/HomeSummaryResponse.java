@@ -24,7 +24,7 @@ public class HomeSummaryResponse {
 
     private final List<LessonResponse> recommended;
 
-    /** Nhiệm vụ nổi bật hôm nay; null khi chưa được giao (nhiệm vụ được giao ở G4). */
+    /** Nhiệm vụ nổi bật hôm nay; null khi chưa được giao (giao khi gọi /v1/quests/today hoặc khi có sự kiện học). */
     private final QuestResponse todayChallenge;
 
     @Getter

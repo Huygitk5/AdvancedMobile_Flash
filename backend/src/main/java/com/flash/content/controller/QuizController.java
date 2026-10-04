@@ -28,7 +28,7 @@ import javax.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Quizzes", description = "Đề kiểm tra (nộp bài ở G4)")
+@Tag(name = "Quizzes", description = "Đề kiểm tra, nộp bài, lịch sử làm bài")
 @RestController
 @RequestMapping("/v1/quizzes")
 @RequiredArgsConstructor

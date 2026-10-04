@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Dùng dữ liệu seed V2 (mock_data.dart). Trạng thái học của user được chèn thẳng bằng SQL
- * vì API ghi tiến độ / ghi chú / bookmark thuộc G4.
+ * để test chỉ đọc (API ghi được kiểm ở GamificationIntegrationTest).
  * Nội dung admin tạo trong test để ở trạng thái nháp, để không làm lệch danh sách seed của test khác.
  */
 class ContentIntegrationTest extends IntegrationTestBase {

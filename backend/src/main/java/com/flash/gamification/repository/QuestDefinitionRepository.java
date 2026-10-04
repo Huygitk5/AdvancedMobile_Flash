@@ -10,6 +10,8 @@ public interface QuestDefinitionRepository extends JpaRepository<QuestDefinition
 
     List<QuestDefinition> findAllByOrderBySortOrderAscCreatedAtAsc();
 
+    List<QuestDefinition> findByIsActiveTrueOrderBySortOrderAscCreatedAtAsc();
+
     boolean existsByCode(String code);
 
     boolean existsByCodeAndIdNot(String code, UUID id);

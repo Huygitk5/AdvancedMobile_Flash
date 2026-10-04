@@ -10,6 +10,8 @@ public interface RewardItemRepository extends JpaRepository<RewardItem, UUID> {
 
     List<RewardItem> findAllByOrderBySortOrderAscCreatedAtAsc();
 
+    List<RewardItem> findByIsActiveTrueOrderBySortOrderAscCreatedAtAsc();
+
     boolean existsByCode(String code);
 
     boolean existsByCodeAndIdNot(String code, UUID id);

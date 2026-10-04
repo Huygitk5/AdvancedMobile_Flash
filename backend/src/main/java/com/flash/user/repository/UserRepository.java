@@ -5,15 +5,25 @@ import com.flash.user.entity.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import javax.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByIdAndDeletedAtIsNull(UUID id);
+
+    /**
+     * SELECT ... FOR UPDATE trên dòng user. Mọi thao tác đổi XP / streak / thống kê / nhiệm vụ
+     * của cùng một user khoá dòng này trước, nên chúng chạy tuần tự và không bị cộng đè nhau.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id and u.deletedAt is null")
+    Optional<User> findActiveForUpdate(@Param("id") UUID id);
 
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 

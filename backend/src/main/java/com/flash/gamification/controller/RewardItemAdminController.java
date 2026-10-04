@@ -23,7 +23,7 @@ import javax.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Shop (Admin)", description = "Vật phẩm cửa hàng. Mua / trang bị ở G4")
+@Tag(name = "Shop (Admin)", description = "Vật phẩm cửa hàng. Mua / trang bị ở ShopController")
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/v1/shop/items")

@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Đề kiểm tra (nội dung). Nộp bài / chấm điểm nằm ở progress (G4). */
+/** Đề kiểm tra (nội dung). Nộp bài / chấm điểm nằm ở progress.service.QuizAttemptService. */
 @Service
 @RequiredArgsConstructor
 public class QuizService {

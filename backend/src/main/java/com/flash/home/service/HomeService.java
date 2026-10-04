@@ -1,6 +1,7 @@
 package com.flash.home.service;
 
 import com.flash.common.enums.ProgressStatus;
+import com.flash.common.util.Zones;
 import com.flash.content.entity.GrammarLesson;
 import com.flash.content.entity.Topic;
 import com.flash.content.repository.GrammarExampleRepository;
@@ -14,21 +15,17 @@ import com.flash.home.dto.LessonResponse;
 import com.flash.home.dto.QuestResponse;
 import com.flash.progress.entity.UserGrammarProgress;
 import com.flash.progress.entity.UserTopicProgress;
-import com.flash.progress.repository.LessonCompletionRepository;
 import com.flash.progress.repository.UserGrammarProgressRepository;
 import com.flash.progress.repository.UserTopicProgressRepository;
+import com.flash.progress.service.LessonService;
 import com.flash.user.entity.User;
-import com.flash.user.entity.UserSettings;
-import com.flash.user.repository.UserSettingsRepository;
 import com.flash.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -44,43 +41,32 @@ import java.util.stream.Collectors;
 public class HomeService {
 
     private static final int RECOMMENDED_LIMIT = 3;
-    private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final UserService userService;
-    private final UserSettingsRepository settingsRepository;
+    private final LessonService lessonService;
     private final TopicRepository topicRepository;
     private final GrammarLessonRepository grammarLessonRepository;
     private final GrammarExampleRepository exampleRepository;
     private final UserTopicProgressRepository topicProgressRepository;
     private final UserGrammarProgressRepository grammarProgressRepository;
-    private final LessonCompletionRepository lessonCompletionRepository;
     private final UserQuestRepository userQuestRepository;
     private final QuestDefinitionRepository questDefinitionRepository;
 
     @Transactional(readOnly = true)
     public HomeSummaryResponse summary(UUID userId) {
         User user = userService.getActiveUser(userId);
-        ZoneId zone = zoneOf(user);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = Zones.today(user);
 
         return HomeSummaryResponse.builder()
                 .fullName(user.getFullName())
                 .streakDays(user.getStreakDays())
                 .currentXp(user.getCurrentXp())
                 .targetXp(user.getTargetXp())
-                .todayLessons(todayLessons(userId, zone, today))
+                .todayLessons(lessonService.todayLessons(user))
                 .continueLesson(continueLesson(userId).orElse(null))
                 .recommended(recommended(user))
                 .todayChallenge(todayChallenge(userId, today).orElse(null))
                 .build();
-    }
-
-    private HomeSummaryResponse.TodayLessons todayLessons(UUID userId, ZoneId zone, LocalDate today) {
-        Instant from = today.atStartOfDay(zone).toInstant();
-        Instant to = today.plusDays(1).atStartOfDay(zone).toInstant();
-        long done = lessonCompletionRepository.countByUserIdAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(userId, from, to);
-        int goal = settingsRepository.findById(userId).map(UserSettings::getDailyGoalLessons).orElse(5);
-        return new HomeSummaryResponse.TodayLessons((int) done, goal);
     }
 
     /** Bài IN_PROGRESS học gần nhất, so giữa topic và grammar. */
@@ -154,13 +140,5 @@ public class HomeService {
 
     private int exampleCount(UUID grammarLessonId) {
         return exampleRepository.findByGrammarLessonIdAndDeletedAtIsNullOrderBySortOrder(grammarLessonId).size();
-    }
-
-    private static ZoneId zoneOf(User user) {
-        try {
-            return ZoneId.of(user.getTimezone());
-        } catch (DateTimeException e) {
-            return DEFAULT_ZONE;
-        }
     }
 }

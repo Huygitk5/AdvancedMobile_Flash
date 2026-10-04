@@ -23,7 +23,7 @@ import javax.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Quests (Admin)", description = "Mẫu nhiệm vụ. Nhiệm vụ hôm nay / nhận thưởng ở G4")
+@Tag(name = "Quests (Admin)", description = "Mẫu nhiệm vụ. Nhiệm vụ hôm nay / nhận thưởng ở QuestController")
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/v1/quests")

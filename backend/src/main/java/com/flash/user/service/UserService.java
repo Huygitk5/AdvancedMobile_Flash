@@ -23,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -69,6 +70,16 @@ public class UserService {
     @Transactional(readOnly = true)
     public User getActiveUser(UUID id) {
         return userRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy người dùng"));
+    }
+
+    /**
+     * Khoá dòng user (SELECT ... FOR UPDATE) cho các thao tác đổi XP / streak / thống kê / nhiệm vụ,
+     * để các request song song của cùng một user chạy tuần tự.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public User lockActiveUser(UUID id) {
+        return userRepository.findActiveForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy người dùng"));
     }
 

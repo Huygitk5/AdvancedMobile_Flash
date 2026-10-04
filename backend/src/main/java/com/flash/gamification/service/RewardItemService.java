@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Quản lý vật phẩm cửa hàng. Mua / trang bị nằm ở ShopService (G4). */
+/** Quản lý vật phẩm cửa hàng. Mua / trang bị nằm ở ShopService. */
 @Service
 @RequiredArgsConstructor
 public class RewardItemService {
@@ -113,7 +113,8 @@ public class RewardItemService {
         }
     }
 
-    private List<Long> readColors(String json) {
+    /** border_colors JSON -> danh sách ARGB; dùng chung cho shop và bảng xếp hạng. */
+    public List<Long> readColors(String json) {
         if (json == null) {
             return null;
         }

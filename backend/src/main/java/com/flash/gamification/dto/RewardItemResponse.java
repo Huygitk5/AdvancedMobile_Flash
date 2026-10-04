@@ -8,7 +8,7 @@ import lombok.Getter;
 import java.util.List;
 import java.util.UUID;
 
-/** Nội dung vật phẩm (bản admin). Bản có isUnlocked / isEquipped của user nằm ở API shop (G4). */
+/** Nội dung vật phẩm (bản admin). Bản có isUnlocked / isEquipped của user là ShopItemResponse. */
 @Getter
 @Builder
 public class RewardItemResponse {

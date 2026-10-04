@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Quản lý mẫu nhiệm vụ. Giao nhiệm vụ cho user / nhận thưởng nằm ở QuestService (G4). */
+/** Quản lý mẫu nhiệm vụ. Giao nhiệm vụ cho user / nhận thưởng nằm ở QuestService. */
 @Service
 @RequiredArgsConstructor
 public class QuestDefinitionService {

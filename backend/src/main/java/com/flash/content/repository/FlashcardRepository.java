@@ -1,10 +1,13 @@
 package com.flash.content.repository;
 
 import com.flash.content.entity.Flashcard;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +26,20 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
 
     @Query(WITH_USER_STATE + "where f.id in :ids and f.deletedAt is null")
     List<Object[]> findByIdsWithUserState(@Param("ids") Collection<UUID> ids, @Param("userId") UUID userId);
+
+    /** Thẻ đã đến hạn ôn (SRS), hạn sớm nhất trước; chỉ trong topic đã xuất bản. */
+    @Query(WITH_USER_STATE + "where f.deletedAt is null and p.dueAt <= :now "
+            + "and (:topicId is null or f.topicId = :topicId) "
+            + "and f.topicId in (select t.id from Topic t where t.isPublished = true and t.deletedAt is null) "
+            + "order by p.dueAt")
+    List<Object[]> findDueWithUserState(@Param("userId") UUID userId, @Param("topicId") UUID topicId,
+                                        @Param("now") Instant now, Pageable pageable);
+
+    /** Từ đã bookmark (left join + điều kiện b không null = inner join), mới bookmark trước. */
+    @Query(value = WITH_USER_STATE + "where b.userId is not null and f.deletedAt is null order by b.updatedAt desc",
+            countQuery = "select count(b) from UserBookmark b, Flashcard f where f.id = b.flashcardId "
+                    + "and b.userId = :userId and b.deletedAt is null and f.deletedAt is null")
+    Page<Object[]> findBookmarkedWithUserState(@Param("userId") UUID userId, Pageable pageable);
 
     Optional<Flashcard> findByIdAndDeletedAtIsNull(UUID id);
 
