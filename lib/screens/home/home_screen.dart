@@ -8,6 +8,7 @@ import '../flashcard/flashcard_screen.dart';
 import '../challenge/challenge_screen.dart';
 import '../grammar/grammar_detail_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
+import '../profile/settings_screen.dart'; // THÊM IMPORT NÀY
 
 class HomeScreen extends StatelessWidget {
   final Function(int)? onSwitchTab;
@@ -17,9 +18,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, 10 + MediaQuery.of(context).padding.bottom),          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
@@ -86,7 +87,7 @@ class HomeScreen extends StatelessWidget {
                   radius: 20,
                   backgroundColor: const Color(0xFFEEF2FF),
                   backgroundImage: (avatar != null && avatar.imageUrl != null && avatar.imageUrl!.isNotEmpty) ? NetworkImage(avatar.imageUrl!) as ImageProvider : null,
-                  child: (avatar == null || avatar.imageUrl == null || avatar.imageUrl!.isEmpty) ? Icon(Icons.person, color: AppTheme.primaryColor) : null,
+                  child: (avatar == null || avatar.imageUrl == null || avatar.imageUrl!.isEmpty) ? const Icon(Icons.person, color: AppTheme.primaryColor) : null,
                 ),
               ),
             ),
@@ -94,7 +95,7 @@ class HomeScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                const Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                 Text('${user.fullName} 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
               ],
             ),
@@ -103,7 +104,16 @@ class HomeScreen extends StatelessWidget {
               icon: Badge(smallSize: 8, backgroundColor: Colors.red, child: Icon(Icons.notifications_none, color: Theme.of(context).textTheme.bodyLarge?.color)),
               onPressed: () => ReminderDialog.show(context),
             ),
-            Icon(Icons.settings_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
+            // ĐÃ BỌC NÚT CÀI ĐẶT BẰNG ICONBUTTON VÀ CHUYỂN TRANG
+            IconButton(
+              icon: Icon(Icons.settings_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
+              },
+            ),
           ],
         ),
         const SizedBox(height: 15),
@@ -117,17 +127,17 @@ class HomeScreen extends StatelessWidget {
               decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(20)),
               child: Row(
                 children: [
-                  Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
+                  const Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
                   const SizedBox(width: 6),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${user.streakDays} ngày', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
-                      Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                      Text('${user.streakDays} ngày', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
+                      const Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
                     ],
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.chevron_right, color: Colors.orange, size: 16),
+                  const Icon(Icons.chevron_right, color: Colors.orange, size: 16),
                 ],
               ),
             ),
@@ -150,7 +160,7 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Tiến độ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
-              Text('3/5 bài >', style: TextStyle(color: AppTheme.greyColor, fontWeight: FontWeight.bold)),
+              const Text('3/5 bài >', style: TextStyle(color: AppTheme.greyColor, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 15),
@@ -166,7 +176,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-              Text('60%', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
+              const Text('60%', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
             ],
           ),
           const SizedBox(height: 20),
@@ -185,7 +195,7 @@ class HomeScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.blue.shade100, borderRadius: BorderRadius.circular(10)),
-                    child: Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
+                    child: const Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
                   ),
                   const SizedBox(width: 15),
                   Expanded(
@@ -194,7 +204,7 @@ class HomeScreen extends StatelessWidget {
                       children: const [
                         Text('Tiếp tục học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                         SizedBox(height: 4),
-                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, )),
+                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
                         SizedBox(height: 4),
                         Text('Bài 12/20 • 8 phút', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                       ],
@@ -234,7 +244,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Đã thêm BuildContext context vào hàm này
   Widget _buildCategoryCard(BuildContext context, String title, String subtitle, IconData icon, Color bgColor, Color iconColor, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -256,12 +265,12 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, )),
-                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.black54)),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B))),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.black38, size: 20),
+            const Icon(Icons.chevron_right, color: Colors.black38, size: 20),
           ],
         ),
       ),
@@ -278,7 +287,7 @@ class HomeScreen extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(right: 15.0),
             child: _buildLessonCard(
-                context, // Thêm context vào đây
+                context,
                 lesson.title,
                 lesson.level,
                 lesson.progress,
@@ -299,7 +308,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Đã thêm BuildContext context vào hàm này và sửa .cardColor54 thành .cardColor.withOpacity(0.54)
   Widget _buildLessonCard(BuildContext context, String title, String level, double progress, String data1, String data2, Color imageBg, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -361,13 +369,13 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
+                      const Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
                       const SizedBox(width: 4),
-                      Text(data1, style: TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                      Text(data1, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
                       const Spacer(),
-                      Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
+                      const Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
                       const SizedBox(width: 4),
-                      Text(data2, style: TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                      Text(data2, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
                     ],
                   )
                 ],
@@ -398,7 +406,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Hoàn thành bài kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, )),
+                Text('Hoàn thành bài kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
                 SizedBox(height: 4),
                 Text('Kiểm tra kiến thức sau bài học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
               ],
@@ -464,13 +472,13 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Top 10 Vinh Danh', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Top 10 Vinh Danh', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
                   Text('Xem vị trí của bạn trên bảng xếp hạng', style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.9), fontSize: 12)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.white, size: 24),
+            const Icon(Icons.chevron_right, color: Colors.white, size: 24),
           ],
         ),
       ),
