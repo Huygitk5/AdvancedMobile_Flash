@@ -7,6 +7,8 @@ import com.flash.security.JwtAuthFilter;
 import com.flash.security.JwtService;
 import com.flash.security.RestAccessDeniedHandler;
 import com.flash.security.RestAuthenticationEntryPoint;
+import com.flash.security.SyncRateLimitFilter;
+import com.flash.sync.SyncProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 /**
  * Stateless REST security với JWT Bearer.
- * Hai filter được tạo bằng new (không phải bean) để Spring Boot không tự đăng ký chúng
+ * Các filter được tạo bằng new (không phải bean) để Spring Boot không tự đăng ký chúng
  * thêm một lần nữa vào servlet filter chain.
  */
 @Configuration
@@ -40,6 +42,7 @@ public class SecurityConfig {
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final JwtService jwtService;
     private final AuthProperties authProperties;
+    private final SyncProperties syncProperties;
     private final ObjectMapper objectMapper;
 
     @Bean
@@ -59,7 +62,10 @@ public class SecurityConfig {
                     .anyRequest().authenticated().and()
                 .addFilterBefore(new AuthRateLimitFilter(authProperties.getRateLimitPerMinute(), objectMapper),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
+                // Sau JwtAuthFilter để đếm theo user đã xác thực
+                .addFilterAfter(new SyncRateLimitFilter(syncProperties.getRateLimitPerMinute(), objectMapper),
+                        JwtAuthFilter.class);
         return http.build();
     }
 

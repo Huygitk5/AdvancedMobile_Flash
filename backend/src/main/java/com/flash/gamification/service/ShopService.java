@@ -191,6 +191,11 @@ public class ShopService {
             if (!op.getUserId().equals(user.getId()) || !OP_SHOP_PURCHASE.equals(op.getOpType())) {
                 throw new BusinessException(ErrorCode.CONFLICT, "Idempotency-Key đã được dùng cho thao tác khác");
             }
+            if (op.getStatus() == SyncOperationStatus.REJECTED) {
+                // Lần mua qua /v1/sync/push với cùng key đã bị từ chối: trả lại đúng lỗi đó
+                ErrorCode code = ErrorCode.valueOf(op.getErrorCode());
+                throw new BusinessException(code, code.getDefaultMessage());
+            }
             UUID inventoryId = readInventoryId(op.getResultJson());
             UserInventory inventory = inventoryRepository.findByIdAndUserId(inventoryId, user.getId()).orElseThrow();
             RewardItem item = itemRepository.findById(inventory.getRewardItemId()).orElseThrow();

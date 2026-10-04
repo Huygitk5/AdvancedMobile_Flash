@@ -1,7 +1,9 @@
 package com.flash.user.service;
 
+import com.flash.common.enums.Resolution;
 import com.flash.user.dto.UpdateSettingsRequest;
 import com.flash.user.dto.UserSettingsResponse;
+import com.flash.user.dto.UserSettingsResult;
 import com.flash.user.entity.UserSettings;
 import com.flash.user.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,26 @@ public class UserSettingsService {
     @Transactional
     public UserSettingsResponse update(UUID userId, UpdateSettingsRequest request) {
         UserSettings settings = getOrCreate(userId);
+        apply(settings, request);
+        return UserSettingsResponse.from(settings);
+    }
+
+    /**
+     * Op SETTINGS_UPDATE từ hàng đợi offline: Last-Write-Wins theo clientUpdatedAt, để thay đổi cũ
+     * của một thiết bị offline lâu ngày không ghi đè lên thay đổi mới hơn từ thiết bị khác.
+     */
+    @Transactional
+    public UserSettingsResult updateIfNewer(UUID userId, UpdateSettingsRequest request) {
+        UserSettings settings = getOrCreate(userId);
+        if (request.getClientUpdatedAt() != null && settings.getClientUpdatedAt() != null
+                && request.getClientUpdatedAt().isBefore(settings.getClientUpdatedAt())) {
+            return new UserSettingsResult(UserSettingsResponse.from(settings), Resolution.CONFLICT_SERVER_WINS);
+        }
+        apply(settings, request);
+        return new UserSettingsResult(UserSettingsResponse.from(settings), Resolution.APPLIED);
+    }
+
+    private void apply(UserSettings settings, UpdateSettingsRequest request) {
         if (request.getIsNotificationEnabled() != null) {
             settings.setIsNotificationEnabled(request.getIsNotificationEnabled());
         }
@@ -48,7 +70,6 @@ public class UserSettingsService {
         }
         settings.setClientUpdatedAt(request.getClientUpdatedAt() != null ? request.getClientUpdatedAt() : Instant.now());
         settingsRepository.saveAndFlush(settings);
-        return UserSettingsResponse.from(settings);
     }
 
     /** User tạo trước khi có bảng settings (hoặc tạo tay trong DB) vẫn có cài đặt mặc định. */

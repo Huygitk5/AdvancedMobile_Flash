@@ -3,6 +3,8 @@ package com.flash.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flash.common.ErrorCode;
 import com.flash.common.JsonErrorWriter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import javax.servlet.FilterChain;
@@ -12,30 +14,32 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 /**
- * Giới hạn số request /v1/auth/** theo (IP, endpoint) trong cửa sổ cố định 1 phút.
- * Sau reverse proxy cần bật server.forward-headers-strategy để getRemoteAddr() là IP thật.
+ * Giới hạn /v1/sync/** theo user (cộng chung push / pull / content) trong cửa sổ 1 phút (§5.3d).
+ * Chạy sau {@link JwtAuthFilter}; request chưa xác thực để Spring Security trả 401 như bình thường.
  */
-public class AuthRateLimitFilter extends OncePerRequestFilter {
+public class SyncRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String AUTH_PREFIX = "/v1/auth/";
+    private static final String SYNC_PREFIX = "/v1/sync/";
 
     private final FixedWindowRateLimiter limiter;
     private final ObjectMapper objectMapper;
 
-    public AuthRateLimitFilter(int limitPerMinute, ObjectMapper objectMapper) {
+    public SyncRateLimitFilter(int limitPerMinute, ObjectMapper objectMapper) {
         this.limiter = new FixedWindowRateLimiter(limitPerMinute);
         this.objectMapper = objectMapper;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith(AUTH_PREFIX);
+        return !request.getRequestURI().startsWith(SYNC_PREFIX);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!limiter.tryAcquire(request.getRemoteAddr() + "|" + request.getRequestURI())) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal
+                && !limiter.tryAcquire(((UserPrincipal) auth.getPrincipal()).getId().toString())) {
             JsonErrorWriter.write(response, objectMapper, ErrorCode.TOO_MANY_REQUESTS);
             return;
         }

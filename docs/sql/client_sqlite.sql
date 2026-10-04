@@ -111,6 +111,7 @@ CREATE TABLE quest_definitions (
   target_value  INTEGER NOT NULL,
   xp_reward     INTEGER NOT NULL,
   icon_name     TEXT    NOT NULL,
+  is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: đã tắt, chỉ giữ cho user_quests cũ
   sort_order    INTEGER NOT NULL DEFAULT 0
 );
 
@@ -124,6 +125,7 @@ CREATE TABLE reward_items (
   image_url          TEXT,
   required_rank      INTEGER NOT NULL DEFAULT 0,
   rank_board         TEXT    NOT NULL DEFAULT 'XP',
+  is_active          INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: gỡ khỏi shop, vẫn hiện trong kho đồ
   sort_order         INTEGER NOT NULL DEFAULT 0,
   server_updated_at  INTEGER NOT NULL
 );

@@ -32,6 +32,7 @@ Khi khởi động, Flyway tự chạy `V1__init.sql` (schema) và `V2__seed_con
 | `SPRING_MAIL_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | trống: OTP quên mật khẩu chỉ in ra log |
 | `MAIL_FROM` | `no-reply@flash.local` |
 | `AUTH_RATE_LIMIT_PER_MINUTE` | `20` request/phút cho mỗi (IP, endpoint) `/v1/auth/**` |
+| `SYNC_RATE_LIMIT_PER_MINUTE` | `30` request/phút cho mỗi user, tính chung `/v1/sync/**` |
 
 ## Test
 

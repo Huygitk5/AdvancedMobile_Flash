@@ -5,9 +5,11 @@ import com.flash.auth.service.RefreshTokenService;
 import com.flash.common.BusinessException;
 import com.flash.common.ErrorCode;
 import com.flash.common.enums.CefrLevel;
+import com.flash.common.enums.Resolution;
 import com.flash.common.util.Emails;
 import com.flash.user.dto.AdminCreateUserRequest;
 import com.flash.user.dto.AdminUpdateUserRequest;
+import com.flash.user.dto.ProfileUpdateResult;
 import com.flash.user.dto.PublicUserResponse;
 import com.flash.user.dto.UpdateProfileRequest;
 import com.flash.user.dto.UserResponse;
@@ -100,13 +102,23 @@ public class UserService {
      */
     @Transactional
     public UserResponse updateProfile(UUID id, UpdateProfileRequest request) {
+        ProfileUpdateResult result = updateProfileIfNewer(id, request);
+        if (result.getResolution() == Resolution.CONFLICT_SERVER_WINS) {
+            throw new BusinessException(ErrorCode.VERSION_CONFLICT,
+                    "Hồ sơ đã được cập nhật từ thiết bị khác", result.getUser());
+        }
+        return result.getUser();
+    }
+
+    /** Như {@link #updateProfile} nhưng trả CONFLICT_SERVER_WINS thay vì ném 409 (dùng cho /v1/sync/push). */
+    @Transactional
+    public ProfileUpdateResult updateProfileIfNewer(UUID id, UpdateProfileRequest request) {
         User user = getActiveUser(id);
         boolean versionMatches = request.getBaseVersion().equals(user.getVersion());
         boolean clientIsNewer = request.getClientUpdatedAt() != null
                 && (user.getClientUpdatedAt() == null || request.getClientUpdatedAt().isAfter(user.getClientUpdatedAt()));
         if (!versionMatches && !clientIsNewer) {
-            throw new BusinessException(ErrorCode.VERSION_CONFLICT,
-                    "Hồ sơ đã được cập nhật từ thiết bị khác", UserResponse.from(user));
+            return new ProfileUpdateResult(UserResponse.from(user), Resolution.CONFLICT_SERVER_WINS);
         }
 
         if (request.getFullName() != null) {
@@ -123,7 +135,7 @@ public class UserService {
         }
         user.setClientUpdatedAt(request.getClientUpdatedAt() != null ? request.getClientUpdatedAt() : Instant.now());
         userRepository.saveAndFlush(user);
-        return UserResponse.from(user);
+        return new ProfileUpdateResult(UserResponse.from(user), Resolution.APPLIED);
     }
 
     @Transactional

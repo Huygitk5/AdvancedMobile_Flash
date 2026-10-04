@@ -1073,6 +1073,7 @@ CREATE TABLE quest_definitions (
   target_value  INTEGER NOT NULL,
   xp_reward     INTEGER NOT NULL,
   icon_name     TEXT    NOT NULL,
+  is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: đã tắt, chỉ giữ cho user_quests cũ
   sort_order    INTEGER NOT NULL DEFAULT 0
 );
 
@@ -1086,6 +1087,7 @@ CREATE TABLE reward_items (
   image_url          TEXT,
   required_rank      INTEGER NOT NULL DEFAULT 0,
   rank_board         TEXT    NOT NULL DEFAULT 'XP',
+  is_active          INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: gỡ khỏi shop, vẫn hiện trong kho đồ
   sort_order         INTEGER NOT NULL DEFAULT 0,
   server_updated_at  INTEGER NOT NULL
 );
@@ -1861,6 +1863,12 @@ Response:
 
 `status` của mỗi op có thể là: `APPLIED`, `DUPLICATE` (đã xử lý trước đó, trả lại kết quả cũ), `CONFLICT_SERVER_WINS`, `REJECTED` (client xoá op và rollback trạng thái lạc quan).
 
+Ngoài ra (bổ sung khi làm G5):
+
+- `FAILED`: lỗi tạm thời phía server, op **chưa** được ghi nhận. Client giữ op và gửi lại với backoff. Các op đứng sau trong cùng lô cũng nhận `FAILED` (`errorCode: "NOT_PROCESSED"`) để giữ thứ tự FIFO.
+- `DUPLICATE` của một op từng bị từ chối thì có kèm `errorCode`: client xử lý như `REJECTED`.
+- Response có thêm `clockOffsetMs`, là độ lệch đã cộng vào mọi timestamp của lô.
+
 Response của pull:
 
 ```json
@@ -1879,6 +1887,8 @@ Response của pull:
   }
 }
 ```
+
+`GET /v1/sync/content` trả cùng dạng `{cursor, hasMore, changes}`, với `changes` gồm `topics`, `flashcards`, `grammarLessons`, `grammarExamples`, `quizzes`, `quizQuestions` (kèm `options[4]`), `questDefinitions`, `rewardItems` và `deleted: {topics: [id], flashcards: [id], ...}`. Bảng nội dung ở client không có tombstone, nên nội dung bị xoá hoặc bị bỏ xuất bản được báo qua `deleted`, và client xoá theo id.
 
 Lưu ý về cursor: server trả `cursor = thời điểm bắt đầu truy vấn − 2 giây` (có chồng lấn nhỏ) để không bỏ sót các transaction commit chậm. Client upsert theo khoá chính nên nhận trùng cũng không sao.
 

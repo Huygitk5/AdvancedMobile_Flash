@@ -192,18 +192,29 @@ Làm theo thứ tự, vì các service sau gọi service trước.
 
 **Việc cần làm**
 
-- [ ] `POST /v1/sync/push`:
+- [x] `POST /v1/sync/push`:
   - Tính `clockOffset = now − clientSentAt`, cộng vào mọi timestamp trong batch.
   - Duyệt op theo thứ tự; **mỗi op 1 transaction riêng** (`TransactionTemplate`).
   - Trước khi xử lý: tìm `op_id` trong `sync_operations` → có rồi thì trả `DUPLICATE` + `result_json` cũ.
   - Dispatcher `opType → handler` gọi lại đúng service ở G4 (không viết logic lần 2).
   - Lưu kết quả vào `sync_operations`; cuối response trả snapshot `user`.
-- [ ] `GET /v1/sync/pull?since=`: với mỗi bảng dữ liệu user, `WHERE user_id=? AND updated_at > ?` (gồm cả dòng có `deleted_at`), cursor = thời điểm bắt đầu − 2 giây, `hasMore` khi vượt `limit`.
-- [ ] `GET /v1/sync/content?since=`: tương tự cho bảng nội dung.
-- [ ] Job `@Scheduled` xoá `sync_operations` > 30 ngày.
-- [ ] Rate limit endpoint sync 30 request/phút/user.
+- [x] `GET /v1/sync/pull?since=`: với mỗi bảng dữ liệu user, `WHERE user_id=? AND updated_at > ?` (gồm cả dòng có `deleted_at`), cursor = thời điểm bắt đầu − 2 giây, `hasMore` khi vượt `limit`.
+- [x] `GET /v1/sync/content?since=`: tương tự cho bảng nội dung.
+- [x] Job `@Scheduled` xoá `sync_operations` > 30 ngày.
+- [x] Rate limit endpoint sync 30 request/phút/user.
 
-**DoD:** Test tích hợp: gửi batch 3 op (review, note xung đột, quest chưa xong) → nhận đúng `APPLIED` / `CONFLICT_SERVER_WINS` / `REJECTED` như ví dụ §6.11; gửi lại cùng batch → toàn `DUPLICATE`, XP không đổi.
+**DoD:** Test tích hợp: gửi batch 3 op (review, note xung đột, quest chưa xong) → nhận đúng `APPLIED` / `CONFLICT_SERVER_WINS` / `REJECTED` như ví dụ §6.11; gửi lại cùng batch → toàn `DUPLICATE`, XP không đổi. ✅ *Đạt: 11 test trong `SyncIntegrationTest`; tổng 71 test đều qua (kể cả `OpenApiDocsTest`).*
+
+*Ghi chú khi làm:*
+- **Push:** mỗi op khoá dòng `users` trước rồi mới tra `sync_operations`, nên hai lần push song song của cùng user không thể chạy trùng một `opId`. Op bị từ chối (`BusinessException`) thì transaction của op rollback, sau đó ghi một dòng `REJECTED` (kèm `error_code`) trong transaction riêng. Gửi lại op đó nhận `DUPLICATE` **kèm `errorCode`**: client coi như bị từ chối.
+- **Trạng thái thêm `FAILED`** (ngoài 4 trạng thái của §6.11): lỗi không phải nghiệp vụ (DB, bug) thì op **không** được ghi nhận, client giữ op và gửi lại với backoff. Các op phía sau trong lô cũng nhận `FAILED` (`errorCode = NOT_PROCESSED`) để giữ đúng FIFO.
+- **Payload** của op được đọc thành đúng DTO của API REST rồi chạy Bean Validation; sai thì `REJECTED` + `VALIDATION_ERROR`. `opType` lạ thì `REJECTED` + `BAD_REQUEST`. Lô > 50 op hoặc thiếu `clientSentAt` thì cả request bị 400.
+- **`SHOP_PURCHASE`:** `opId` chính là `Idempotency-Key`, nên REST `/v1/shop/purchase` và sync dùng chung sổ. Lần mua bị từ chối qua sync rồi gửi lại cùng key qua REST sẽ nhận lại đúng lỗi cũ.
+- **LWW không ném lỗi khi sync:** `PROFILE_UPDATE` (`UserService.updateProfileIfNewer`) và `SETTINGS_UPDATE` (`UserSettingsService.updateIfNewer`, LWW theo `clientUpdatedAt`) trả `CONFLICT_SERVER_WINS` kèm bản server. REST `PUT /v1/users/update` vẫn trả 409 như cũ.
+- **Pull:** đọc trong 1 transaction chỉ đọc (snapshot REPEATABLE READ). Mỗi bảng tối đa `limit` dòng (mặc định 500, tối đa 1000). Khi có bảng vượt limit thì cursor dừng ngay trước dòng đầu tiên chưa trả (ranh giới cắt theo nguyên nhóm cùng `updated_at`). `changes.user` luôn có, `changes.settings` chỉ có khi đổi.
+- **Content:** client không có `deleted_at` cho nội dung, nên response có `changes.deleted.{topics, flashcards, grammarLessons, grammarExamples, quizzes, quizQuestions}`: các id đã xoá mềm, bỏ xuất bản, hoặc có cha bị ẩn. Cha có trong delta thì gửi kèm toàn bộ con đang hiển thị (xuất bản lại topic thì thẻ cũ cũng về lại). `rewardItems` / `questDefinitions` gửi cả dòng `isActive = false` vì kho đồ / nhiệm vụ cũ vẫn tham chiếu tới. **G6 cần thêm cột `is_active`** vào 2 bảng này ở SQLite.
+- **Swagger:** springdoc tự sinh `/v3/api-docs` từ controller nên Swagger UI (`/swagger-ui.html`) luôn khớp code. Hiện có 74 path / 75 operation thuộc 16 tag, đều có `summary`. `OpenApiDocsTest` chặn việc thêm endpoint mà quên `@Tag` / `@Operation` và ghi bản api-docs ra `backend/target/openapi.json`. `POST /v1/sync/push` có body mẫu 3 op (dùng id seed V2) và danh sách `opType` để bấm "Try it out".
+- **Rate limit:** `SyncRateLimitFilter` chạy sau `JwtAuthFilter`, đếm theo user, tính chung cả push/pull/content (`app.sync.rate-limit-per-minute`, mặc định 30). Logic cửa sổ 1 phút tách thành `FixedWindowRateLimiter`, dùng chung với rate limit của auth.
 
 ---
 
@@ -234,6 +245,7 @@ Làm theo thứ tự, vì các service sau gọi service trước.
   ├── screens/ ...
   └── data/mock_data.dart   (xoá ở cuối G8)
   ```
+- [ ] **Tra cứu API trên Swagger** (`http://localhost:8080/swagger-ui.html`, hoặc `backend/target/openapi.json` sau khi chạy test) khi viết DTO ở `data/remote/dto/`. JSON dùng camelCase, timestamp ISO-8601 UTC, ngày `YYYY-MM-DD`. Client SQLite lưu epoch ms nên cần converter `Instant` ↔ `int`.
 - [ ] **Tận dụng thẳng `client_sqlite.sql`**: Drift đọc được file `.drift` chứa `CREATE TABLE`.
   - Copy `docs/sql/client_sqlite.sql` → `lib/data/local/schema.drift`, **bỏ dòng `PRAGMA`**.
   - ```dart
@@ -247,12 +259,16 @@ Làm theo thứ tự, vì các service sau gọi service trước.
     }
     ```
   - `dart run build_runner build --delete-conflicting-outputs`.
+  - DDL đã có cột `is_active` cho `reward_items` và `quest_definitions` (thêm sau G5), vì `/v1/sync/content` gửi cả vật phẩm / nhiệm vụ đã tắt. Shop lọc `is_active = 1`; kho đồ và nhiệm vụ cũ vẫn hiển thị bình thường.
 - [ ] `SecureStore` với các key §4.2 (`encryptedSharedPreferences: true` trên Android).
 - [ ] `AppPrefs` với các key §4.3. Đọc trong `main()` **trước** `runApp` để áp dark mode/ngôn ngữ không bị nháy.
-- [ ] `ApiClient` (Dio): baseUrl theo môi trường (Android emulator dùng `http://10.0.2.2:8080`), `AuthInterceptor` gắn Bearer, refresh chủ động trước hạn 60 giây, khi 401 thì refresh một lần (khoá để nhiều request không refresh cùng lúc) rồi gọi lại; refresh thất bại → đăng xuất.
+- [ ] `ApiClient` (Dio): baseUrl theo môi trường (Android emulator dùng `http://10.0.2.2:8080`, máy thật dùng IP LAN của máy chạy backend), `AuthInterceptor` gắn Bearer, refresh chủ động trước hạn 60 giây, khi 401 thì refresh một lần (khoá để nhiều request không refresh cùng lúc) rồi gọi lại; refresh thất bại → đăng xuất.
+  - Bóc envelope `{success, code, message, data, errors}` ở một chỗ: thành công trả `data`, lỗi ném `ApiException(httpStatus, code, message, errors, data)`. Riêng 409 `VERSION_CONFLICT` có `data` là bản server.
+  - Mã lỗi nghiệp vụ lấy theo `ErrorCode` ở backend (`INSUFFICIENT_XP`, `ALREADY_OWNED`, `RANK_REQUIREMENT_NOT_MET`, `QUEST_NOT_COMPLETED`, `TOO_MANY_REQUESTS`…); map sang thông báo tiếng Việt ở UI.
+  - 429: không retry ngay. `/v1/auth/**` giới hạn 20 request/phút theo IP, `/v1/sync/**` 30 request/phút theo user.
 - [ ] Hàm tiện ích `newId()` = `Uuid().v4()`; mọi bản ghi tạo ở client dùng hàm này.
 
-**DoD:** App build được; test Drift in-memory (`NativeDatabase.memory()`) tạo đủ 26 bảng; đọc/ghi SecureStore và AppPrefs được.
+**DoD:** App build được; test Drift in-memory (`NativeDatabase.memory()`) tạo đủ 25 bảng; đọc/ghi SecureStore và AppPrefs được.
 
 ---
 
@@ -266,16 +282,23 @@ Làm theo thứ tự, vì các service sau gọi service trước.
 - [ ] `SyncWorker.flush()`:
   1. Đưa op `in_flight` còn sót về `pending` (lúc khởi động app).
   2. Lấy ≤ 50 op `pending` có `next_retry_at ≤ now` theo `id`, đánh dấu `in_flight`.
-  3. Gọi `/v1/sync/push` kèm `clientSentAt`.
-  4. Theo từng kết quả: `APPLIED`/`DUPLICATE` → ghi đè dữ liệu chuẩn từ server, `is_dirty=0`, `synced`, xoá op; `CONFLICT_SERVER_WINS` → ghi đè + báo snackbar; `REJECTED` → rollback trạng thái lạc quan, op → `dead`.
-  5. Lỗi mạng / 5xx → `pending`, `attempt_count++`, backoff `min(2^n × 5s, 30 phút)`.
+  3. Gọi `/v1/sync/push` với `{deviceId, clientSentAt, operations: [{opId, opType, createdAt, payload}]}`. `clientSentAt` lấy **ngay trước khi gửi** (server dựa vào nó để tính lệch đồng hồ). `payload` đúng bảng §3.4, cũng là body của API REST tương ứng (xem Swagger, schema `SyncOperation`).
+  4. Theo từng kết quả (`results[i]` khớp thứ tự op gửi lên):
+     - `APPLIED` / `DUPLICATE` (không có `errorCode`): ghi đè bằng `data` (cùng shape với response REST: `ReviewResponse`, `NoteResult`, `BookmarkResult`, `QuizResultResponse`…), đặt `is_dirty=0`, `synced`, rồi xoá op.
+     - `CONFLICT_SERVER_WINS`: ghi đè bằng bản server trong `data` và báo snackbar.
+     - `REJECTED`, hoặc `DUPLICATE` **có `errorCode`** (op từng bị từ chối): rollback trạng thái lạc quan, op chuyển `dead`, ghi `last_error = errorCode`.
+     - `FAILED` (lỗi tạm thời phía server, kể cả `errorCode = NOT_PROCESSED` của các op đứng sau): giữ `pending`, backoff như lỗi mạng.
+  5. Lỗi mạng / 5xx / 429 → `pending`, `attempt_count++`, backoff `min(2^n × 5s, 30 phút)`.
   6. Cập nhật `user_profile` theo snapshot `user`, đặt `pending_xp = 0` khi hàng đợi rỗng.
   7. Một khoá (mutex) để chỉ một `flush()` chạy cùng lúc.
-- [ ] `PullService`: gọi `/sync/content` **trước** `/sync/pull`; upsert trong 1 transaction cùng cập nhật `sync_meta`; **bỏ qua dòng có `is_dirty = 1`**; dòng có `deletedAt` → xoá local; lặp khi `hasMore`.
-- [ ] Trigger: mở app, `AppLifecycleState.resumed`, `connectivity_plus` báo có mạng, sau push thành công, `workmanager` định kỳ 15 phút (constraint: có mạng).
+- [ ] `PullService`: gọi `/v1/sync/content` **trước** `/v1/sync/pull`. Cả hai nhận `?since=<cursor>&limit=500` (lần đầu bỏ `since`), trả `{cursor, hasMore, changes}`. Mỗi trang upsert trong 1 transaction cùng lưu `cursor` vào `sync_meta` (scope `content` / `user_data`), lặp khi `hasMore`.
+  - **Content:** `changes.{topics, flashcards, grammarLessons, grammarExamples, quizzes, quizQuestions, questDefinitions, rewardItems}`; `updatedAt` → `server_updated_at`; `quizQuestions[].options[4]` → `quiz_question_options`. `changes.deleted.{topics, flashcards, …}` là danh sách id cần **xoá** khỏi cache (FK cascade dọn bảng con).
+  - **User data:** `changes.{userFlashcardProgress, userFlashcardNotes, userBookmarks, userTopicProgress, userGrammarProgress, userQuests, userInventories, dailyStatistics}`. **Bỏ qua dòng local có `is_dirty = 1`**. Ghi chú / bookmark có `deletedAt` thì giữ tombstone ở local (UI lọc `deleted_at IS NULL`). `changes.user` luôn có → ghi đè `user_profile` (trừ khi profile đang dirty); `changes.settings` chỉ có khi đổi.
+- [ ] **Mua đồ** (§5.3e): gọi thẳng `POST /v1/shop/purchase` với header `Idempotency-Key = op_id` mới. Nếu mất mạng sau khi gửi thì enqueue `SHOP_PURCHASE {rewardItemId}` với **cùng `op_id`**: server dùng chung sổ nên không bao giờ mua hai lần.
+- [ ] Trigger: mở app, `AppLifecycleState.resumed`, `connectivity_plus` báo có mạng, sau push thành công, `workmanager` định kỳ 15 phút (constraint: có mạng). **Debounce** khoảng 2 giây và gộp các trigger lại, vì push + pull + content tính chung hạn mức 30 request/phút/user.
 - [ ] Đăng xuất / đổi tài khoản: xoá Secure Storage + các bảng nhóm B, C (§3.1); so `local_db_owner_user_id` khi đăng nhập.
 
-**DoD:** Test với API giả lập (mock Dio): op được gộp đúng; lỗi mạng → retry với backoff; `REJECTED` → rollback; pull không đè dòng dirty.
+**DoD:** Test với API giả lập (mock Dio): op được gộp đúng; lỗi mạng / `FAILED` / 429 → retry với backoff; `REJECTED` và `DUPLICATE` kèm `errorCode` → rollback; pull không đè dòng dirty; `deleted` của content xoá đúng dòng; lặp đúng khi `hasMore`. Chạy thêm một lần với backend thật (`docker compose up -d mysql` + `mvnw spring-boot:run`).
 
 ---
 
@@ -288,6 +311,8 @@ Mỗi màn hình làm theo cùng một khuôn:
 3. Provider Riverpod, màn hình chuyển sang `ConsumerWidget` và `ref.watch(...)`.
 4. Xoá tham chiếu `MockData.*` của màn hình đó.
 5. Thử: online, rồi bật chế độ máy bay và làm lại.
+
+Endpoint, request/response của từng màn hình tra trên Swagger UI. Đọc dữ liệu luôn đi qua SQLite (đã được `/v1/sync/*` đổ về). Chỉ gọi thẳng API REST cho đăng nhập, mua đồ, leaderboard, `/v1/home/summary` và thống kê nếu cần số mới nhất.
 
 Thứ tự (theo hiện trạng `grep MockData` trong `lib/`):
 
@@ -314,7 +339,7 @@ Thứ tự (theo hiện trạng `grep MockData` trong `lib/`):
 
 **Tự động**
 
-- [ ] Backend: Testcontainers MySQL 8 cho test tích hợp (chạy luôn Flyway V1 → kiểm DDL thật), JUnit cho service G4/G5.
+- [x] Backend: Testcontainers MySQL 8 cho test tích hợp (chạy luôn Flyway V1 → kiểm DDL thật), JUnit cho service G4/G5. *Đã có từ G1–G5: 71 test, gồm `SyncIntegrationTest` và `OpenApiDocsTest`. Chạy `cd backend && mvnw test`, cần Docker.*
 - [ ] Flutter: test Drift in-memory cho DAO, test `SyncWorker`/`PullService` với Dio giả lập, widget test cho FlashcardScreen.
 
 **Kịch bản offline bắt buộc (chạy tay trên máy thật)**
@@ -331,14 +356,18 @@ Thứ tự (theo hiện trạng `grep MockData` trong `lib/`):
 | 8 | Claim quest offline nhưng tiến độ thật chưa đủ | Bị từ chối, nút quay lại trạng thái chưa nhận |
 | 9 | Đăng xuất → đăng nhập tài khoản khác | Không thấy dữ liệu của tài khoản cũ |
 | 10 | Access token hết hạn giữa lúc dùng | Tự refresh, người dùng không bị đăng xuất |
+| 11 | Admin bỏ xuất bản / xoá một topic khi app đang offline | Có mạng lại → topic và thẻ biến khỏi app; xuất bản lại → hiện lại đủ thẻ |
+| 12 | Offline lâu, tích > 50 op rồi bật mạng | Gửi nhiều lô liên tiếp, không bị 429 làm mất op, thứ tự FIFO giữ nguyên |
 
-**DoD:** Toàn bộ test tự động xanh; 10 kịch bản trên đạt.
+**DoD:** Toàn bộ test tự động xanh; 12 kịch bản trên đạt.
 
 ---
 
 ## G10 — Triển khai
 
-- [ ] Backend: `Dockerfile` (eclipse-temurin:17-jre), biến môi trường cho DB, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, mail; profile `prod` tắt Swagger hoặc bảo vệ bằng basic auth.
+- [ ] Backend: `Dockerfile` (eclipse-temurin:17-jre), biến môi trường theo `backend/README.md`: `DB_*`, `JWT_SECRET` (≥ 32 ký tự), `GOOGLE_CLIENT_IDS`, `SPRING_MAIL_*`, `MAIL_FROM`, `ADMIN_EMAIL` / `ADMIN_PASSWORD`, `AUTH_RATE_LIMIT_PER_MINUTE`, `SYNC_RATE_LIMIT_PER_MINUTE`.
+- [ ] Swagger ở production: `application-prod.yml` đặt `springdoc.api-docs.enabled=false` và `springdoc.swagger-ui.enabled=false`, đồng thời bỏ `/swagger-ui/**`, `/v3/api-docs/**` khỏi `PUBLIC_PATHS` của `SecurityConfig`. Nếu vẫn cần tài liệu cho team thì để bật nhưng chỉ cho `ADMIN`. Bản `openapi.json` từ `OpenApiDocsTest` có thể lưu kèm mỗi bản release.
+- [ ] Sau reverse proxy: bật `server.forward-headers-strategy=framework` để rate limit auth đếm theo IP thật. Rate limit hiện nằm trong bộ nhớ, chỉ đúng khi chạy **1 instance**; nhiều instance thì chuyển sang Redis/Bucket4j. Job dọn `sync_operations` cũng cần chạy trên đúng 1 instance (hoặc dùng ShedLock).
 - [ ] MySQL production: bật backup hằng ngày, `innodb_ft_min_token_size=2`, user DB riêng chỉ có quyền trên `flash_db`.
 - [ ] HTTPS bắt buộc (reverse proxy Nginx/Caddy).
 - [ ] Flutter: cấu hình `baseUrl` theo flavor (dev/prod), SHA-1 cho Google Sign-In Android, `flutter build apk --release`.
@@ -351,6 +380,7 @@ Thứ tự (theo hiện trạng `grep MockData` trong `lib/`):
 ## Phụ lục — Quy ước khi làm
 
 - **Đổi schema**: sửa file trong `docs/sql/` **và** tạo migration mới (Flyway `V3__...sql` ở server, tăng `schemaVersion` + `onUpgrade` ở Drift). Không sửa migration đã chạy.
-- **Thêm loại thao tác offline mới**: thêm vào `CHECK` của `sync_queue.op_type`, thêm handler ở dispatcher G5, thêm dòng vào bảng §3.4.
+- **Thêm loại thao tác offline mới**: thêm vào `CHECK` của `sync_queue.op_type`, thêm giá trị vào `SyncOpType` + nhánh trong `SyncOpDispatcher` (và `allowableValues` của `SyncPushRequest.opType` cho Swagger), thêm dòng vào bảng §3.4.
+- **Thêm endpoint**: luôn có `@Tag` ở controller và `@Operation(summary = ...)` ở method, nếu không `OpenApiDocsTest` sẽ báo lỗi.
 - **Không bao giờ** thêm API nhận số XP/streak từ client (§5.3d).
 - Commit nhỏ theo từng ô checklist; mỗi giai đoạn một PR.
