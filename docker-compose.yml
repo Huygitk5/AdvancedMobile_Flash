@@ -1,0 +1,30 @@
+# Môi trường dev: MySQL 8 cho backend (docs/IMPLEMENTATION_PLAN.md - G0)
+#   docker compose up -d mysql
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: flash-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: flash_db
+      MYSQL_USER: flash
+      MYSQL_PASSWORD: flash
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb_ft_min_token_size=2
+      - --default-time-zone=+00:00
+    ports:
+      # 3307 ở host để không đụng MySQL của dự án khác đang dùng 3306
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql_data:
