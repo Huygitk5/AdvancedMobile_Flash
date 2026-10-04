@@ -1461,6 +1461,7 @@ Stream<double> watchTopicProgress(String topicId) {
 | `refresh_token` | String | Lấy access token mới qua `/v1/auth/refresh-token`. Được rotate sau mỗi lần dùng. |
 | `access_token_expires_at` | String (epoch ms) | Chủ động refresh trước khi hết hạn khoảng 60 giây, tránh 401. |
 | `user_id` | String (UUID) | Biết đang đăng nhập ai, kiểm tra DB local có đúng chủ không. |
+| `user_role` | String | `USER` / `ADMIN`: chọn màn đầu tiên (`MainScreen` / `AdminMainScreen`) khi mở app, kể cả lúc offline. |
 | `device_id` | String (UUID) | Sinh 1 lần, gửi khi login để server gắn refresh token theo thiết bị (đăng xuất từng máy). |
 
 Android: `AndroidOptions(encryptedSharedPreferences: true)`. iOS: `IOSOptions(accessibility: KeychainAccessibility.first_unlock)` để background sync vẫn đọc được token.
