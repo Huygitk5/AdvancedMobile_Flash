@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart'; // Bổ sung import dữ liệu
+import '../../data/mock_data.dart';
+import '../../models/reward_item_model.dart';
 import '../../widgets/reminder_dialog.dart';
 import '../vocabulary/topic_screen.dart';
 import '../flashcard/flashcard_screen.dart';
@@ -9,13 +10,12 @@ import '../grammar/grammar_detail_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  final Function(int)? onSwitchTab; // Bổ sung hàm callback để đổi tab
+  final Function(int)? onSwitchTab;
   const HomeScreen({Key? key, this.onSwitchTab}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
@@ -26,22 +26,18 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 25),
               _buildProgressSection(context),
               const SizedBox(height: 25),
-
-              _buildSectionTitle('Danh mục học tập'),
+              _buildSectionTitle('Danh mục học tập', context),
               const SizedBox(height: 15),
               _buildCategories(context),
               const SizedBox(height: 25),
-
-              _buildSectionTitle('Bài học gợi ý cho bạn'),
+              _buildSectionTitle('Bài học gợi ý cho bạn', context),
               const SizedBox(height: 15),
-              _buildSuggestedLessons(context), // Truyền context vào đây
+              _buildSuggestedLessons(context),
               const SizedBox(height: 25),
-
-              _buildSectionTitle('Thử thách hôm nay'),
+              _buildSectionTitle('Thử thách hôm nay', context),
               const SizedBox(height: 15),
               _buildChallengeSection(context),
               const SizedBox(height: 25),
-
               _buildLeaderboardBanner(context),
               const SizedBox(height: 20),
             ],
@@ -52,40 +48,45 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    // Lấy thông tin user hiện tại
     final user = MockData.currentUser;
 
-    // Hàm lấy màu viền đang được dùng từ Shop
     List<Color> getEquippedBorderColors() {
-      final equipped = MockData.shopItems.firstWhere(
-            (item) => item.isEquipped && item.type == 'border',
-        orElse: () => MockData.shopItems[0],
-      );
-      return equipped.borderColors.map((hex) => Color(hex)).toList();
+      try {
+        final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'border');
+        final item = MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
+        return item.borderColors.map((hex) => Color(hex)).toList();
+      } catch (e) {
+        return [const Color(0xFFE2E8F0), const Color(0xFFCBD5E1)];
+      }
     }
+
+    RewardItem? getEquippedAvatar() {
+      try {
+        final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'avatar');
+        return MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    final avatar = getEquippedAvatar();
+    List<Color> gradientColors = getEquippedBorderColors();
 
     return Column(
       children: [
         Row(
           children: [
-            // Thay thế CircleAvatar cũ bằng Avatar có viền Gradient
             Container(
               padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: getEquippedBorderColors(),
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const CircleAvatar(
+                decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle),
+                child: CircleAvatar(
                   radius: 20,
-                  backgroundColor: Color(0xFFEEF2FF),
-                  child: Icon(Icons.person, color: AppTheme.primaryColor),
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  backgroundImage: (avatar != null && avatar.imageUrl != null && avatar.imageUrl!.isNotEmpty) ? NetworkImage(avatar.imageUrl!) as ImageProvider : null,
+                  child: (avatar == null || avatar.imageUrl == null || avatar.imageUrl!.isEmpty) ? Icon(Icons.person, color: AppTheme.primaryColor) : null,
                 ),
               ),
             ),
@@ -93,21 +94,16 @@ class HomeScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                // Sử dụng fullName từ dữ liệu động
-                Text('${user.fullName} 👋', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                Text('${user.fullName} 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
               ],
             ),
             const Spacer(),
             IconButton(
-              icon: const Badge(
-                smallSize: 8,
-                backgroundColor: Colors.red,
-                child: Icon(Icons.notifications_none, color: Color(0xFF1E293B)),
-              ),
+              icon: Badge(smallSize: 8, backgroundColor: Colors.red, child: Icon(Icons.notifications_none, color: Theme.of(context).textTheme.bodyLarge?.color)),
               onPressed: () => ReminderDialog.show(context),
             ),
-            const Icon(Icons.settings_outlined, color: Color(0xFF1E293B)),
+            Icon(Icons.settings_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
           ],
         ),
         const SizedBox(height: 15),
@@ -115,32 +111,23 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Expanded(
-              child: Text(
-                'Hôm nay là một ngày tuyệt vời\nđể học tiếng Anh!',
-                style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4),
-              ),
-            ),
+            const Expanded(child: Text('Hôm nay là một ngày tuyệt vời để học tiếng Anh!', style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4))),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
+              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(20)),
               child: Row(
                 children: [
-                  const Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
+                  Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
                   const SizedBox(width: 6),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Lấy số ngày streak từ dữ liệu động
-                      Text('${user.streakDays} ngày', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
-                      const Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                      Text('${user.streakDays} ngày', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
+                      Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
                     ],
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, color: Colors.orange, size: 16),
+                  Icon(Icons.chevron_right, color: Colors.orange, size: 16),
                 ],
               ),
             ),
@@ -154,15 +141,15 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Tiến độ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            children: [
+              Text('Tiến độ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
               Text('3/5 bài >', style: TextStyle(color: AppTheme.greyColor, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -179,7 +166,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-              const Text('60%', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
+              Text('60%', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
             ],
           ),
           const SizedBox(height: 20),
@@ -198,7 +185,7 @@ class HomeScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.blue.shade100, borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
+                    child: Icon(Icons.menu_book_rounded, color: AppTheme.primaryColor),
                   ),
                   const SizedBox(width: 15),
                   Expanded(
@@ -207,16 +194,16 @@ class HomeScreen extends StatelessWidget {
                       children: const [
                         Text('Tiếp tục học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                         SizedBox(height: 4),
-                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, )),
                         SizedBox(height: 4),
                         Text('Bài 12/20 • 8 phút', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                       ],
                     ),
                   ),
-                  const CircleAvatar(
+                  CircleAvatar(
                     backgroundColor: AppTheme.primaryColor,
                     radius: 20,
-                    child: Icon(Icons.play_arrow, color: Colors.white),
+                    child: Icon(Icons.play_arrow, color: Theme.of(context).cardColor),
                   )
                 ],
               ),
@@ -232,14 +219,14 @@ class HomeScreen extends StatelessWidget {
       children: [
         Expanded(
           child: _buildCategoryCard(
-            'Từ vựng', 'Hơn 2000+ từ', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green,
+            context, 'Từ vựng', 'Hơn 2000+ từ', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green,
                 () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TopicScreen(initialIndex: 0))),
           ),
         ),
         const SizedBox(width: 15),
         Expanded(
           child: _buildCategoryCard(
-            'Ngữ pháp', 'Các chủ điểm', Icons.description, const Color(0xFFF3E5F5), Colors.purple,
+            context, 'Ngữ pháp', 'Các chủ điểm', Icons.description, const Color(0xFFF3E5F5), Colors.purple,
                 () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TopicScreen(initialIndex: 1))),
           ),
         ),
@@ -247,7 +234,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryCard(String title, String subtitle, IconData icon, Color bgColor, Color iconColor, VoidCallback onTap) {
+  // Đã thêm BuildContext context vào hàm này
+  Widget _buildCategoryCard(BuildContext context, String title, String subtitle, IconData icon, Color bgColor, Color iconColor, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -261,19 +249,19 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: Colors.white, size: 24),
+              child: Icon(icon, color: Theme.of(context).cardColor, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, )),
+                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.black54)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.black38, size: 20),
+            Icon(Icons.chevron_right, color: Colors.black38, size: 20),
           ],
         ),
       ),
@@ -290,6 +278,7 @@ class HomeScreen extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(right: 15.0),
             child: _buildLessonCard(
+                context, // Thêm context vào đây
                 lesson.title,
                 lesson.level,
                 lesson.progress,
@@ -297,11 +286,11 @@ class HomeScreen extends StatelessWidget {
                 lesson.estimatedTime,
                 lesson.imageBg,
                     () {
-                      if (lesson.type == 'vocabulary') {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: lesson.title)));
-                      } else if (lesson.type == 'grammar') {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: lesson.title)));
-                      }
+                  if (lesson.type == 'vocabulary') {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: lesson.title)));
+                  } else if (lesson.type == 'grammar') {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: lesson.title)));
+                  }
                 }
             ),
           );
@@ -310,13 +299,14 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLessonCard(String title, String level, double progress, String data1, String data2, Color imageBg, VoidCallback onTap) {
+  // Đã thêm BuildContext context vào hàm này và sửa .cardColor54 thành .cardColor.withOpacity(0.54)
+  Widget _buildLessonCard(BuildContext context, String title, String level, double progress, String data1, String data2, Color imageBg, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 200,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -330,7 +320,7 @@ class HomeScreen extends StatelessWidget {
                     color: imageBg,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  child: const Center(child: Icon(Icons.image, color: Colors.white54, size: 40)),
+                  child: Center(child: Icon(Icons.image, color: Theme.of(context).cardColor.withOpacity(0.54), size: 40)),
                 ),
                 Positioned(
                   top: 10,
@@ -338,10 +328,10 @@ class HomeScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(level, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Text(level, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Theme.of(context).textTheme.bodyLarge?.color)),
                   ),
                 )
               ],
@@ -351,7 +341,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color)),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -365,19 +355,19 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      Text('${(progress * 100).toInt()}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
+                      Icon(Icons.menu_book, size: 14, color: AppTheme.greyColor),
                       const SizedBox(width: 4),
-                      Text(data1, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                      Text(data1, style: TextStyle(fontSize: 12, color: AppTheme.greyColor)),
                       const Spacer(),
-                      const Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
+                      Icon(Icons.access_time, size: 14, color: AppTheme.greyColor),
                       const SizedBox(width: 4),
-                      Text(data2, style: const TextStyle(fontSize: 12, color: AppTheme.greyColor)),
+                      Text(data2, style: TextStyle(fontSize: 12, color: AppTheme.greyColor)),
                     ],
                   )
                 ],
@@ -398,17 +388,17 @@ class HomeScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             backgroundColor: Colors.amber,
             radius: 24,
-            child: Icon(Icons.emoji_events, color: Colors.white, size: 28),
+            child: Icon(Icons.emoji_events, color: Theme.of(context).cardColor, size: 28),
           ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Hoàn thành bài kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('Hoàn thành bài kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, )),
                 SizedBox(height: 4),
                 Text('Kiểm tra kiến thức sau bài học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
               ],
@@ -427,7 +417,7 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const ChallengeScreen()));
               }
             },
-            child: const Text('Bắt đầu', style: TextStyle(color: Colors.white, fontSize: 12)),
+            child: Text('Bắt đầu', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 12)),
           )
         ],
       ),
@@ -464,39 +454,33 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Theme.of(context).cardColor.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.emoji_events, color: Colors.white, size: 30),
+              child: Icon(Icons.emoji_events, color: Theme.of(context).cardColor, size: 30),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Top 10 Vinh Danh',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Xem vị trí của bạn và các học viên khác',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
+                children: [
+                  Text('Top 10 Vinh Danh', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('Xem vị trí của bạn trên bảng xếp hạng', style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.9), fontSize: 12)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white, size: 24),
+            Icon(Icons.chevron_right, color: Colors.white, size: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, BuildContext context) {
     return Text(
         title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)
     );
   }
 }

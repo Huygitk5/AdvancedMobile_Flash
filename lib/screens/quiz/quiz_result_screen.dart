@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../models/quiz_result_model.dart';
+import '../../models/quiz_review_model.dart'; // THÊM IMPORT NÀY
 import 'quiz_review_screen.dart'; // Import màn hình mới
 
 class QuizResultScreen extends StatelessWidget {
   final QuizResult result;
+  final List<QuizReviewItem> reviewData;
 
-  const QuizResultScreen({Key? key, required this.result}) : super(key: key);
+  const QuizResultScreen({Key? key, required this.result, required this.reviewData}) : super(key: key);
 
   String _formatTime(int seconds) {
     int minutes = seconds ~/ 60;
@@ -19,15 +21,13 @@ class QuizResultScreen extends StatelessWidget {
     int totalQuestions = result.correctAnswers + result.wrongAnswers;
 
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.close, ),
           onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
         ),
-        title: const Text('Kết quả bài kiểm tra', style: TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text('Kết quả bài kiểm tra', style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -38,18 +38,18 @@ class QuizResultScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: [
-                    const Icon(Icons.emoji_events, color: Colors.amber, size: 80),
+                    Icon(Icons.emoji_events, color: Colors.amber, size: 80),
                     const SizedBox(height: 10),
-                    Text('${result.correctAnswers}/$totalQuestions', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
-                    const Text('Tuyệt vời!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    Text('${result.correctAnswers}/$totalQuestions', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
+                    Text('Tuyệt vời!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, )),
                     const SizedBox(height: 5),
-                    const Text('Bạn đã hoàn thành bài kiểm tra.', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                    Text('Bạn đã hoàn thành bài kiểm tra.', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                     const SizedBox(height: 30),
 
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.grey.shade200),
                         boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 10, offset: const Offset(0, 5))],
@@ -80,13 +80,12 @@ class QuizResultScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                   onPressed: () {
-                    // Chuyển sang màn hình xem chi tiết
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => QuizReviewScreen(result: result)),
+                      MaterialPageRoute(builder: (context) => QuizReviewScreen(result: result, reviewData: reviewData)), // TRUYỀN DỮ LIỆU ĐI TIẾP
                     );
                   },
-                  child: const Text('Xem chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text('Xem chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
                 ),
               ),
             ),
@@ -99,7 +98,7 @@ class QuizResultScreen extends StatelessWidget {
   Widget _buildStatItem(String label, String value, Color color, {bool isTime = false}) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+        Text(label, style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
         const SizedBox(height: 5),
         Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: isTime ? 14 : 22)),
       ],

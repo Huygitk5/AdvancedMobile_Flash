@@ -59,14 +59,14 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
             'Ghi chú cho "${card.word}"',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
         ),
         content: TextField(
           controller: noteController,
           maxLines: 4, // Ô nhập liệu rộng 4 dòng
           decoration: InputDecoration(
             hintText: 'Nhập mẹo nhớ, ngữ cảnh sử dụng...',
-            hintStyle: const TextStyle(color: AppTheme.greyColor, fontSize: 14),
+            hintStyle: TextStyle(color: AppTheme.greyColor, fontSize: 14),
             filled: true,
             fillColor: const Color(0xFFF4F6FA),
             border: OutlineInputBorder(
@@ -78,7 +78,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor)),
+            child: Text('Hủy', style: TextStyle(color: AppTheme.greyColor)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -92,7 +92,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               });
               Navigator.pop(context);
             },
-            child: const Text('Lưu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text('Lưu', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -104,18 +104,16 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     Flashcard currentCard = MockData.flashcards[currentIndex];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F6FA),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20),
+          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.topicTitle,
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
+          style: TextStyle(
+            
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -165,11 +163,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           children: [
             Text(
               '${currentIndex + 1}/${MockData.flashcards.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             Text(
               'Bài học: ${widget.topicTitle}',
-              style: const TextStyle(color: AppTheme.greyColor, fontSize: 12),
+              style: TextStyle(color: AppTheme.greyColor, fontSize: 12),
             ),
           ],
         ),
@@ -220,7 +218,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   Widget _buildCardContainer(Flashcard card, {required bool isBack}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -255,7 +253,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                   color: Colors.blue.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.volume_up, color: AppTheme.primaryColor, size: 20),
+                child: Icon(Icons.volume_up, color: AppTheme.primaryColor, size: 20),
               ),
             ),
           ),
@@ -270,13 +268,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
       children: [
         Text(
           card.word,
-          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 10),
         Text(
           card.pronunciation,
-          style: const TextStyle(fontSize: 18, color: AppTheme.greyColor),
+          style: TextStyle(fontSize: 18, color: AppTheme.greyColor),
         ),
         const SizedBox(height: 20),
         Container(
@@ -287,7 +285,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           ),
           child: Text(
             '(${card.partOfSpeech})', // Xóa chữ 'const' trước Text và dùng nội suy chuỗi
-            style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
+            style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
           ),
         ),
       ],
@@ -301,13 +299,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           const SizedBox(height: 50),
           Text(
             card.word,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             card.pronunciation,
-            style: const TextStyle(fontSize: 16, color: AppTheme.greyColor),
+            style: TextStyle(fontSize: 16, color: AppTheme.greyColor),
           ),
           const SizedBox(height: 12),
           Container(
@@ -318,7 +316,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             ),
             child: Text(
               '(${card.partOfSpeech})', // Xóa chữ 'const' trước Text và dùng nội suy chuỗi
-              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
+              style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14), // Thêm 'const' vào TextStyle để tối ưu
             ),
           ),
 
@@ -329,7 +327,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
 
           Text(
             card.meaning,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 25),
@@ -339,16 +337,16 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Ví dụ:', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('Ví dụ:', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 8),
                 Text(
                   card.example,
-                  style: const TextStyle(fontSize: 16, color: Color(0xFF1E293B), fontWeight: FontWeight.w500, height: 1.4),
+                  style: TextStyle(fontSize: 16,  fontWeight: FontWeight.w500, height: 1.4),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   card.exampleTranslation,
-                  style: const TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4),
+                  style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4),
                 ),
               ],
             ),
@@ -442,7 +440,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white, size: 20),
+              child: Icon(icon, color: Theme.of(context).cardColor, size: 20),
             ),
             const SizedBox(width: 10),
             Column(
@@ -488,7 +486,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Ghi chú cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                  Text('Ghi chú cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, )),
                   const SizedBox(height: 4),
                   // Hiển thị ghi chú thật nếu có, ngược lại hiện chữ gợi ý
                   Text(

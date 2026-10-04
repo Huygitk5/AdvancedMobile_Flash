@@ -57,12 +57,10 @@ class _TopicScreenState extends State<TopicScreen> {
       length: 2,
       initialIndex: widget.initialIndex,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F6FA),
         appBar: AppBar(
           automaticallyImplyLeading: false, // Đã ẩn nút Back
-          backgroundColor: Colors.white,
           elevation: 0,
-          title: const Text('Học tập', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold)),
+          title: Text('Học tập', style: TextStyle( fontWeight: FontWeight.bold)),
           centerTitle: true,
           bottom: const TabBar(
             labelColor: AppTheme.primaryColor,
@@ -141,9 +139,9 @@ class _TopicScreenState extends State<TopicScreen> {
         },
         decoration: InputDecoration(
           hintText: hint,
-          prefixIcon: const Icon(Icons.search, color: AppTheme.greyColor),
+          prefixIcon: Icon(Icons.search, color: AppTheme.greyColor),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: Theme.of(context).cardColor,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide.none,
@@ -210,7 +208,7 @@ class _TopicScreenState extends State<TopicScreen> {
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))],
         ),
@@ -219,16 +217,16 @@ class _TopicScreenState extends State<TopicScreen> {
             Container(
               width: 50, height: 50,
               decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
-              child: Center(child: Text(topic.iconPath, style: const TextStyle(fontSize: 24))),
+              child: Center(child: Text(topic.iconPath, style: TextStyle(fontSize: 24))),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(topic.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(topic.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 5),
-                  Text('${topic.totalWords} từ', style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                  Text('${topic.totalWords} từ', style: TextStyle(color: AppTheme.greyColor, fontSize: 13)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -242,14 +240,14 @@ class _TopicScreenState extends State<TopicScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text('${(topic.progress * 100).toInt()}%', style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                      Text('${(topic.progress * 100).toInt()}%', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            const Icon(Icons.chevron_right, color: AppTheme.greyColor),
+            Icon(Icons.chevron_right, color: AppTheme.greyColor),
           ],
         ),
       ),
@@ -262,7 +260,7 @@ class _TopicScreenState extends State<TopicScreen> {
     Color statusColor = progress == 1.0 ? Colors.green : AppTheme.greyColor;
 
     Widget trailingIcon = progress == 1.0
-        ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
+        ? Icon(Icons.check_circle, color: Colors.green, size: 28)
         : Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: progress > 0 ? Colors.blueAccent : Colors.grey.shade300, width: 2.5)));
 
     // Map string từ API sang Icon Flutter
@@ -281,19 +279,19 @@ class _TopicScreenState extends State<TopicScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))]),
+        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))]),
         child: Row(
           children: [
             Container(
               width: 50, height: 50, decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(getIcon(grammar.iconName), color: Colors.white, size: 26),
+              child: Icon(getIcon(grammar.iconName), color: Theme.of(context).cardColor, size: 26),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(grammar.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                  Text(grammar.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, )),
                   const SizedBox(height: 5),
                   Text(grammar.status, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
