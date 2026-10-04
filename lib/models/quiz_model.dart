@@ -2,8 +2,9 @@ class QuizQuestion {
   final String id;
   final String topicId;
   final String questionText;
-  final List<String> options; // Danh sách 4 đáp án (A, B, C, D)
-  final int correctAnswerIndex; // Vị trí đáp án đúng (0, 1, 2, 3)
+  final List<String> options;
+  final int correctAnswerIndex;
+  final String explanation; // THÊM TRƯỜNG NÀY ĐỂ LƯU GIẢI THÍCH
 
   QuizQuestion({
     required this.id,
@@ -11,6 +12,7 @@ class QuizQuestion {
     required this.questionText,
     required this.options,
     required this.correctAnswerIndex,
+    required this.explanation, // BẮT BUỘC TRUYỀN
   });
 
   factory QuizQuestion.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class QuizQuestion {
       questionText: json['questionText'] ?? '',
       options: List<String>.from(json['options'] ?? []),
       correctAnswerIndex: json['correctAnswerIndex'] ?? 0,
+      explanation: json['explanation'] ?? '',
     );
   }
 }

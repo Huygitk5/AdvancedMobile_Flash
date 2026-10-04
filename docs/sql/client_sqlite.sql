@@ -1,0 +1,401 @@
+-- =====================================================================
+-- AdvancedMobile_Flash - Client local schema (SQLite 3.35+, dùng qua Drift)
+-- Conventions:
+--   * Tên bảng/cột trùng với server (snake_case) để mapper đơn giản.
+--   * Thời gian: INTEGER epoch milliseconds UTC. Boolean: INTEGER 0/1.
+--   * Bảng nội dung (cache, read-only): chỉ có server_updated_at, KHÔNG có cờ sync.
+--   * Bảng do user tạo/sửa: is_dirty, sync_status, last_synced_at, version (server
+--     version mà bản local dựa trên), client_updated_at, deleted_at (tombstone local).
+-- =====================================================================
+
+PRAGMA foreign_keys = ON;
+
+-- ---------------------------------------------------------------------
+-- A. CONTENT CACHE (read-only, pull từ server, phục vụ học offline)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE topics (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  title              TEXT    NOT NULL,
+  description        TEXT,
+  icon_path          TEXT    NOT NULL,
+  level              TEXT    NOT NULL DEFAULT 'A1',
+  cover_color        INTEGER,
+  estimated_minutes  INTEGER NOT NULL DEFAULT 10,
+  total_words        INTEGER NOT NULL DEFAULT 0,
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  server_updated_at  INTEGER NOT NULL
+);
+CREATE INDEX idx_topics_sort ON topics (sort_order);
+
+CREATE TABLE flashcards (
+  id                   TEXT    NOT NULL PRIMARY KEY,
+  topic_id             TEXT    NOT NULL REFERENCES topics (id) ON DELETE CASCADE,
+  word                 TEXT    NOT NULL,
+  part_of_speech       TEXT    NOT NULL,
+  pronunciation        TEXT    NOT NULL,
+  meaning              TEXT    NOT NULL,
+  example              TEXT,
+  example_translation  TEXT,
+  audio_url            TEXT,
+  image_url            TEXT,
+  sort_order           INTEGER NOT NULL DEFAULT 0,
+  server_updated_at    INTEGER NOT NULL
+);
+CREATE INDEX idx_flashcards_topic ON flashcards (topic_id, sort_order);
+CREATE INDEX idx_flashcards_word  ON flashcards (word COLLATE NOCASE);
+
+CREATE TABLE grammar_lessons (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  title              TEXT    NOT NULL,
+  description        TEXT,
+  structure          TEXT    NOT NULL,
+  content            TEXT,
+  usage_notes        TEXT,
+  icon_name          TEXT    NOT NULL,
+  level              TEXT    NOT NULL DEFAULT 'A1',
+  cover_color        INTEGER,
+  estimated_minutes  INTEGER NOT NULL DEFAULT 10,
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  server_updated_at  INTEGER NOT NULL
+);
+
+CREATE TABLE grammar_examples (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  grammar_lesson_id  TEXT    NOT NULL REFERENCES grammar_lessons (id) ON DELETE CASCADE,
+  sentence           TEXT    NOT NULL,
+  translation        TEXT,
+  highlight          TEXT,
+  sort_order         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_ge_lesson ON grammar_examples (grammar_lesson_id, sort_order);
+
+CREATE TABLE quizzes (
+  id                  TEXT    NOT NULL PRIMARY KEY,
+  title               TEXT    NOT NULL,
+  quiz_type           TEXT    NOT NULL CHECK (quiz_type IN ('TOPIC','GRAMMAR')),
+  topic_id            TEXT    REFERENCES topics (id) ON DELETE CASCADE,
+  grammar_lesson_id   TEXT    REFERENCES grammar_lessons (id) ON DELETE CASCADE,
+  time_limit_seconds  INTEGER,
+  pass_score_percent  INTEGER NOT NULL DEFAULT 70,
+  server_updated_at   INTEGER NOT NULL,
+  CHECK ((topic_id IS NULL) <> (grammar_lesson_id IS NULL))
+);
+CREATE INDEX idx_quizzes_topic   ON quizzes (topic_id);
+CREATE INDEX idx_quizzes_grammar ON quizzes (grammar_lesson_id);
+
+CREATE TABLE quiz_questions (
+  id                    TEXT    NOT NULL PRIMARY KEY,
+  quiz_id               TEXT    NOT NULL REFERENCES quizzes (id) ON DELETE CASCADE,
+  flashcard_id          TEXT,
+  question_text         TEXT    NOT NULL,
+  correct_option_index  INTEGER NOT NULL CHECK (correct_option_index BETWEEN 0 AND 3),
+  explanation           TEXT,
+  sort_order            INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_qq_quiz ON quiz_questions (quiz_id, sort_order);
+
+CREATE TABLE quiz_question_options (
+  question_id   TEXT    NOT NULL REFERENCES quiz_questions (id) ON DELETE CASCADE,
+  option_index  INTEGER NOT NULL CHECK (option_index BETWEEN 0 AND 3),
+  option_text   TEXT    NOT NULL,
+  PRIMARY KEY (question_id, option_index)
+) WITHOUT ROWID;
+
+CREATE TABLE quest_definitions (
+  id            TEXT    NOT NULL PRIMARY KEY,
+  code          TEXT    NOT NULL UNIQUE,
+  title         TEXT    NOT NULL,
+  quest_type    TEXT    NOT NULL,
+  frequency     TEXT    NOT NULL DEFAULT 'DAILY',
+  target_value  INTEGER NOT NULL,
+  xp_reward     INTEGER NOT NULL,
+  icon_name     TEXT    NOT NULL,
+  is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: đã tắt, chỉ giữ cho user_quests cũ
+  sort_order    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE reward_items (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  code               TEXT    NOT NULL UNIQUE,
+  name               TEXT    NOT NULL,
+  item_type          TEXT    NOT NULL CHECK (item_type IN ('BORDER','AVATAR')),
+  xp_cost            INTEGER NOT NULL DEFAULT 0,
+  border_colors      TEXT,               -- JSON array ARGB int, VD: "[4294198070,4294940672]"
+  image_url          TEXT,
+  required_rank      INTEGER NOT NULL DEFAULT 0,
+  rank_board         TEXT    NOT NULL DEFAULT 'XP',
+  is_active          INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),  -- 0: gỡ khỏi shop, vẫn hiện trong kho đồ
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  server_updated_at  INTEGER NOT NULL
+);
+
+-- Read-only cache có TTL (VD 5 phút), không bao giờ ghi từ client.
+CREATE TABLE leaderboard_cache (
+  board       TEXT    NOT NULL CHECK (board IN ('XP','STREAK')),
+  rank_no     INTEGER NOT NULL,
+  user_id     TEXT    NOT NULL,
+  full_name   TEXT    NOT NULL,
+  avatar_url  TEXT,
+  score       INTEGER NOT NULL,
+  fetched_at  INTEGER NOT NULL,
+  PRIMARY KEY (board, user_id)
+) WITHOUT ROWID;
+CREATE INDEX idx_lb_rank ON leaderboard_cache (board, rank_no);
+
+-- ---------------------------------------------------------------------
+-- B. USER DATA (đọc/ghi local, có cờ đồng bộ)
+-- ---------------------------------------------------------------------
+
+-- Bản cache của user đang đăng nhập (1 dòng). XP/streak là giá trị server trả về;
+-- client chỉ được sửa slogan / full_name / level (các cột hồ sơ).
+CREATE TABLE user_profile (
+  id                   TEXT    NOT NULL PRIMARY KEY,
+  email                TEXT    NOT NULL,
+  full_name            TEXT    NOT NULL,
+  avatar_url           TEXT,
+  level                TEXT    NOT NULL DEFAULT 'A1',
+  slogan               TEXT    NOT NULL DEFAULT 'Học, học nữa, học mãi!',
+  current_xp           INTEGER NOT NULL DEFAULT 0,
+  pending_xp           INTEGER NOT NULL DEFAULT 0,  -- XP dự kiến từ thao tác chưa sync (chỉ để hiển thị)
+  target_xp            INTEGER NOT NULL DEFAULT 100,
+  total_lifetime_xp    INTEGER NOT NULL DEFAULT 0,
+  streak_days          INTEGER NOT NULL DEFAULT 0,
+  longest_streak       INTEGER NOT NULL DEFAULT 0,
+  last_active_date     TEXT,                         -- 'YYYY-MM-DD'
+  total_words_learned  INTEGER NOT NULL DEFAULT 0,
+  completed_lessons    INTEGER NOT NULL DEFAULT 0,
+  -- sync
+  version              INTEGER NOT NULL DEFAULT 0,
+  client_updated_at    INTEGER,
+  is_dirty             INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status          TEXT    NOT NULL DEFAULT 'synced'
+                       CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at       INTEGER
+);
+
+CREATE TABLE user_flashcard_progress (
+  flashcard_id      TEXT    NOT NULL PRIMARY KEY REFERENCES flashcards (id) ON DELETE CASCADE,
+  box               INTEGER NOT NULL DEFAULT 0 CHECK (box BETWEEN 0 AND 5),
+  repetitions       INTEGER NOT NULL DEFAULT 0,
+  again_count       INTEGER NOT NULL DEFAULT 0,
+  know_count        INTEGER NOT NULL DEFAULT 0,
+  last_rating       TEXT    CHECK (last_rating IN ('AGAIN','KNOW')),
+  is_learned        INTEGER NOT NULL DEFAULT 0 CHECK (is_learned IN (0,1)),
+  last_reviewed_at  INTEGER,
+  due_at            INTEGER,
+  -- sync
+  version           INTEGER NOT NULL DEFAULT 0,
+  client_updated_at INTEGER,
+  is_dirty          INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status       TEXT    NOT NULL DEFAULT 'synced'
+                    CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at    INTEGER
+);
+CREATE INDEX idx_ufp_due   ON user_flashcard_progress (due_at);
+CREATE INDEX idx_ufp_dirty ON user_flashcard_progress (is_dirty);
+
+-- Append-only, mỗi lần bấm Again/Know. Là "sự kiện" gửi lên server.
+CREATE TABLE flashcard_review_logs (
+  id                TEXT    NOT NULL PRIMARY KEY,        -- UUID v4 sinh tại client
+  flashcard_id      TEXT    NOT NULL REFERENCES flashcards (id) ON DELETE CASCADE,
+  rating            TEXT    NOT NULL CHECK (rating IN ('AGAIN','KNOW')),
+  box_before        INTEGER NOT NULL,
+  box_after         INTEGER NOT NULL,
+  response_time_ms  INTEGER,
+  reviewed_at       INTEGER NOT NULL,
+  -- sync
+  sync_status       TEXT    NOT NULL DEFAULT 'pending_create'
+                    CHECK (sync_status IN ('synced','pending_create')),
+  last_synced_at    INTEGER
+);
+CREATE INDEX idx_frl_time ON flashcard_review_logs (reviewed_at);
+CREATE INDEX idx_frl_sync ON flashcard_review_logs (sync_status);
+
+CREATE TABLE user_flashcard_notes (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  flashcard_id       TEXT    NOT NULL UNIQUE REFERENCES flashcards (id) ON DELETE CASCADE,
+  content            TEXT    NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 0,
+  client_updated_at  INTEGER NOT NULL,
+  deleted_at         INTEGER,
+  is_dirty           INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status        TEXT    NOT NULL DEFAULT 'synced'
+                     CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at     INTEGER
+);
+CREATE INDEX idx_ufn_dirty ON user_flashcard_notes (is_dirty);
+
+CREATE TABLE user_bookmarks (
+  flashcard_id       TEXT    NOT NULL PRIMARY KEY REFERENCES flashcards (id) ON DELETE CASCADE,
+  created_at         INTEGER NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 0,
+  client_updated_at  INTEGER NOT NULL,
+  deleted_at         INTEGER,                -- tombstone: bỏ bookmark khi offline
+  is_dirty           INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status        TEXT    NOT NULL DEFAULT 'synced'
+                     CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at     INTEGER
+);
+CREATE INDEX idx_ub_list ON user_bookmarks (deleted_at, created_at);
+
+-- Tiến độ theo topic/grammar: client tính lạc quan để UI phản hồi ngay,
+-- server trả về giá trị chuẩn và ghi đè khi pull.
+CREATE TABLE user_topic_progress (
+  topic_id         TEXT    NOT NULL PRIMARY KEY REFERENCES topics (id) ON DELETE CASCADE,
+  learned_words    INTEGER NOT NULL DEFAULT 0,
+  status           TEXT    NOT NULL DEFAULT 'NOT_STARTED'
+                   CHECK (status IN ('NOT_STARTED','IN_PROGRESS','COMPLETED')),
+  last_studied_at  INTEGER,
+  completed_at     INTEGER,
+  version          INTEGER NOT NULL DEFAULT 0,
+  is_dirty         INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status      TEXT    NOT NULL DEFAULT 'synced'
+                   CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at   INTEGER
+);
+CREATE INDEX idx_utp_status ON user_topic_progress (status);
+
+CREATE TABLE user_grammar_progress (
+  grammar_lesson_id   TEXT    NOT NULL PRIMARY KEY REFERENCES grammar_lessons (id) ON DELETE CASCADE,
+  progress            REAL    NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 1),
+  status              TEXT    NOT NULL DEFAULT 'NOT_STARTED'
+                      CHECK (status IN ('NOT_STARTED','IN_PROGRESS','COMPLETED')),
+  best_score_percent  INTEGER,
+  last_studied_at     INTEGER,
+  completed_at        INTEGER,
+  version             INTEGER NOT NULL DEFAULT 0,
+  is_dirty            INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status         TEXT    NOT NULL DEFAULT 'synced'
+                      CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at      INTEGER
+);
+
+CREATE TABLE lesson_completions (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  lesson_type        TEXT    NOT NULL CHECK (lesson_type IN ('TOPIC','GRAMMAR')),
+  topic_id           TEXT    REFERENCES topics (id) ON DELETE CASCADE,
+  grammar_lesson_id  TEXT    REFERENCES grammar_lessons (id) ON DELETE CASCADE,
+  cards_reviewed     INTEGER NOT NULL DEFAULT 0,
+  duration_seconds   INTEGER NOT NULL DEFAULT 0,
+  completed_at       INTEGER NOT NULL,
+  sync_status        TEXT    NOT NULL DEFAULT 'pending_create'
+                     CHECK (sync_status IN ('synced','pending_create')),
+  last_synced_at     INTEGER,
+  CHECK ((topic_id IS NULL) <> (grammar_lesson_id IS NULL))
+);
+CREATE INDEX idx_lc_time ON lesson_completions (completed_at);
+
+CREATE TABLE quiz_attempts (
+  id                  TEXT    NOT NULL PRIMARY KEY,
+  quiz_id             TEXT    NOT NULL REFERENCES quizzes (id) ON DELETE CASCADE,
+  total_questions     INTEGER NOT NULL,
+  correct_answers     INTEGER NOT NULL,       -- chấm tạm ở client; server chấm lại và ghi đè
+  wrong_answers       INTEGER NOT NULL,
+  score_percent       INTEGER NOT NULL,
+  time_taken_seconds  INTEGER NOT NULL,
+  started_at          INTEGER NOT NULL,
+  submitted_at        INTEGER NOT NULL,
+  xp_awarded          INTEGER,                -- NULL cho tới khi server xác nhận
+  sync_status         TEXT    NOT NULL DEFAULT 'pending_create'
+                      CHECK (sync_status IN ('synced','pending_create')),
+  last_synced_at      INTEGER
+);
+CREATE INDEX idx_qa_quiz_time ON quiz_attempts (quiz_id, submitted_at);
+
+CREATE TABLE quiz_attempt_answers (
+  attempt_id             TEXT    NOT NULL REFERENCES quiz_attempts (id) ON DELETE CASCADE,
+  question_id            TEXT    NOT NULL REFERENCES quiz_questions (id) ON DELETE CASCADE,
+  selected_option_index  INTEGER CHECK (selected_option_index IS NULL OR selected_option_index BETWEEN 0 AND 3),
+  is_correct             INTEGER NOT NULL CHECK (is_correct IN (0,1)),
+  answered_at            INTEGER,
+  PRIMARY KEY (attempt_id, question_id)
+) WITHOUT ROWID;
+
+CREATE TABLE user_quests (
+  id                   TEXT    NOT NULL PRIMARY KEY,
+  quest_definition_id  TEXT    NOT NULL REFERENCES quest_definitions (id) ON DELETE CASCADE,
+  period_start         TEXT    NOT NULL,      -- 'YYYY-MM-DD'
+  current_value        INTEGER NOT NULL DEFAULT 0,
+  target_value         INTEGER NOT NULL,
+  xp_reward            INTEGER NOT NULL,
+  completed_at         INTEGER,
+  is_claimed           INTEGER NOT NULL DEFAULT 0 CHECK (is_claimed IN (0,1)),
+  claimed_at           INTEGER,
+  version              INTEGER NOT NULL DEFAULT 0,
+  is_dirty             INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status          TEXT    NOT NULL DEFAULT 'synced'
+                       CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at       INTEGER,
+  UNIQUE (quest_definition_id, period_start)
+);
+CREATE INDEX idx_uq_period ON user_quests (period_start);
+
+CREATE TABLE user_inventories (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  reward_item_id     TEXT    NOT NULL UNIQUE REFERENCES reward_items (id) ON DELETE CASCADE,
+  is_equipped        INTEGER NOT NULL DEFAULT 0 CHECK (is_equipped IN (0,1)),
+  unlocked_at        INTEGER NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 0,
+  client_updated_at  INTEGER,
+  is_dirty           INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  sync_status        TEXT    NOT NULL DEFAULT 'synced'
+                     CHECK (sync_status IN ('synced','pending_create','pending_update','pending_delete')),
+  last_synced_at     INTEGER
+);
+
+-- Bản local để vẽ biểu đồ offline; client cộng dồn lạc quan, server ghi đè khi pull.
+CREATE TABLE daily_statistics (
+  stat_date          TEXT    NOT NULL PRIMARY KEY,   -- 'YYYY-MM-DD' theo giờ địa phương
+  id                 TEXT,                           -- id server, NULL nếu chưa sync
+  words_learned      INTEGER NOT NULL DEFAULT 0,
+  cards_reviewed     INTEGER NOT NULL DEFAULT 0,
+  xp_gained          INTEGER NOT NULL DEFAULT 0,
+  lessons_completed  INTEGER NOT NULL DEFAULT 0,
+  quizzes_completed  INTEGER NOT NULL DEFAULT 0,
+  correct_answers    INTEGER NOT NULL DEFAULT 0,
+  total_answers      INTEGER NOT NULL DEFAULT 0,
+  study_seconds      INTEGER NOT NULL DEFAULT 0,
+  is_dirty           INTEGER NOT NULL DEFAULT 0 CHECK (is_dirty IN (0,1)),
+  last_synced_at     INTEGER
+) WITHOUT ROWID;
+
+-- ---------------------------------------------------------------------
+-- C. SYNC INFRASTRUCTURE
+-- ---------------------------------------------------------------------
+
+-- Outbox / hàng đợi ngoại tuyến. Ghi CÙNG transaction với thay đổi dữ liệu.
+CREATE TABLE sync_queue (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,  -- thứ tự FIFO
+  op_id          TEXT    NOT NULL UNIQUE,            -- UUID, idempotency key gửi lên server
+  op_type        TEXT    NOT NULL CHECK (op_type IN (
+                   'FLASHCARD_REVIEW',   -- bấm Again / Know
+                   'LESSON_COMPLETE',    -- hoàn thành bài học
+                   'QUIZ_SUBMIT',        -- nộp bài kiểm tra
+                   'NOTE_UPSERT', 'NOTE_DELETE',
+                   'BOOKMARK_SET',       -- payload {flashcardId, bookmarked}
+                   'QUEST_CLAIM',        -- nhận thưởng XP
+                   'PROFILE_UPDATE',     -- sửa slogan / tên / level
+                   'ITEM_EQUIP',         -- trang bị / tháo viền, avatar
+                   'SHOP_PURCHASE',      -- chỉ để retry khi mất mạng giữa chừng (xem Phần 5)
+                   'SETTINGS_UPDATE')),
+  entity_table   TEXT    NOT NULL,
+  entity_id      TEXT    NOT NULL,
+  payload        TEXT    NOT NULL,                   -- JSON
+  status         TEXT    NOT NULL DEFAULT 'pending'
+                 CHECK (status IN ('pending','in_flight','failed','dead')),
+  attempt_count  INTEGER NOT NULL DEFAULT 0,
+  next_retry_at  INTEGER NOT NULL DEFAULT 0,
+  last_error     TEXT,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX idx_sq_ready  ON sync_queue (status, next_retry_at, id);
+CREATE INDEX idx_sq_entity ON sync_queue (entity_table, entity_id, status);
+
+-- Con trỏ delta-pull theo từng nhóm dữ liệu (cập nhật cùng transaction với dữ liệu pull về).
+CREATE TABLE sync_meta (
+  scope           TEXT    NOT NULL PRIMARY KEY,  -- 'content', 'user_data', 'leaderboard'...
+  server_cursor   TEXT,                          -- giá trị serverTime/cursor server trả về
+  last_pulled_at  INTEGER,
+  last_pushed_at  INTEGER
+) WITHOUT ROWID;

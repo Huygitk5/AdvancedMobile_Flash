@@ -11,7 +11,6 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
@@ -28,7 +27,7 @@ class WelcomeScreen extends StatelessWidget {
                   color: Colors.amber.shade50, // Nền vàng nhạt cho hợp với tia sét
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.flash_on, // Icon tia sét
                   size: 100,
                   color: Colors.amber, // Màu vàng cam
@@ -37,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 40),
 
               // Cập nhật Tiêu đề thành "Flash"
-              const Text(
+              Text(
                 'Flash',
                 style: TextStyle(
                   fontSize: 36, // Chữ to hơn một chút
@@ -49,7 +48,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Mô tả
-              const Text(
+              Text(
                 'Học tiếng Anh & Ngữ pháp\nhiệu quả, mọi lúc, mọi nơi',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -77,7 +76,7 @@ class WelcomeScreen extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => const LoginScreen()),
                     );
                   },
-                  child: const Text('Đăng nhập', style: TextStyle(fontSize: 16, color: AppTheme.primaryColor)),
+                  child: Text('Đăng nhập', style: TextStyle(fontSize: 16, color: AppTheme.primaryColor)),
                 ),
               ),
               const SizedBox(height: 30),
@@ -99,13 +98,13 @@ class WelcomeScreen extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => const RegisterScreen()),
                     );
                   },
-                  child: const Text('Đăng ký', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  child: Text('Đăng ký', style: TextStyle(fontSize: 16, color: Theme.of(context).cardColor)),
                 ),
               ),
               const SizedBox(height: 16),
 
               // Đăng nhập MXH
-              const Text('Hoặc tiếp tục với', style: TextStyle(color: AppTheme.greyColor)),
+              Text('Hoặc tiếp tục với', style: TextStyle(color: AppTheme.greyColor)),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

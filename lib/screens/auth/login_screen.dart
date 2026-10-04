@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../main/main_screen.dart';
+import '../admin/admin_main_screen.dart'; // Thêm import màn hình Admin
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -13,13 +14,12 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
+  bool _isAdminLogin = false; // Biến lưu trạng thái chọn User/Admin
 
   void _handleGoogleSignIn() {
-    // Logic gọi Google Sign In sẽ được cấu hình ở phần dưới
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Đang kết nối Google...')),
     );
-    // Giả lập đăng nhập thành công
     Future.delayed(const Duration(seconds: 1), () {
       Navigator.pushReplacement(
         context,
@@ -28,15 +28,22 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  void _handleLogin() {
+    // Xử lý chuyển hướng dựa trên Role được chọn
+    if (_isAdminLogin) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminMainScreen()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainScreen()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20),
+          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -46,12 +53,58 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Đăng nhập', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+              Text('Đăng nhập', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
               const SizedBox(height: 10),
-              const Text('Chào mừng trở lại! Hãy đăng nhập để tiếp tục tiến độ học tập của bạn.', style: TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
-              const SizedBox(height: 40),
+              Text('Chào mừng trở lại! Hãy tiếp tục hành trình của bạn.', style: TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
+              const SizedBox(height: 30),
 
-              _buildTextField('Email', Icons.email_outlined, hint: 'huy_dev@gmail.com'),
+              // UI CHỌN QUYỀN (USER / ADMIN)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6FA),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isAdminLogin = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_isAdminLogin ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: !_isAdminLogin ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
+                          ),
+                          child: Center(
+                            child: Text('Học viên', style: TextStyle(fontWeight: FontWeight.bold, color: !_isAdminLogin ? AppTheme.primaryColor : AppTheme.greyColor)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isAdminLogin = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _isAdminLogin ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: _isAdminLogin ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
+                          ),
+                          child: Center(
+                            child: Text('Quản trị viên', style: TextStyle(fontWeight: FontWeight.bold, color: _isAdminLogin ? AppTheme.primaryColor : AppTheme.greyColor)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              _buildTextField('Email', Icons.email_outlined, hint: 'Nhập email của bạn'),
               const SizedBox(height: 20),
               _buildTextField('Mật khẩu', Icons.lock_outline, isPassword: true),
 
@@ -61,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()));
                   },
-                  child: const Text('Quên mật khẩu?', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                  child: Text('Quên mật khẩu?', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -74,10 +127,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainScreen()));
-                  },
-                  child: const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  onPressed: _handleLogin, // Gọi hàm xử lý phân quyền
+                  child: Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
                 ),
               ),
               const SizedBox(height: 30),
@@ -103,8 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                   onPressed: _handleGoogleSignIn,
-                  icon: const Icon(Icons.g_mobiledata, color: Colors.red, size: 32),
-                  label: const Text('Tiếp tục với Google', style: TextStyle(color: Color(0xFF1E293B), fontSize: 16, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.g_mobiledata, color: Colors.red, size: 32),
+                  label: Text('Tiếp tục với Google', style: TextStyle( fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 30),
@@ -112,12 +163,12 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Chưa có tài khoản? ', style: TextStyle(color: AppTheme.greyColor)),
+                  Text('Chưa có tài khoản? ', style: TextStyle(color: AppTheme.greyColor)),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
                     },
-                    child: const Text('Đăng ký ngay', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                    child: Text('Đăng ký ngay', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
                   ),
                 ],
               )
@@ -132,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+        Text(label, style: TextStyle(fontWeight: FontWeight.bold, )),
         const SizedBox(height: 8),
         TextField(
           obscureText: isPassword && _obscurePassword,

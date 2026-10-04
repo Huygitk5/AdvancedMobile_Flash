@@ -15,12 +15,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20),
+          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -30,9 +28,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Đăng ký', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+              Text('Đăng ký', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
               const SizedBox(height: 10),
-              const Text('Tạo tài khoản để bắt đầu hành trình chinh phục tiếng Anh của bạn.', style: TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
+              Text('Tạo tài khoản để bắt đầu hành trình chinh phục tiếng Anh của bạn.', style: TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
               const SizedBox(height: 30),
 
               _buildTextField('Họ và tên', Icons.person_outline, hint: 'Nhập tên của bạn'),
@@ -57,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           (route) => false,
                     );
                   },
-                  child: const Text('Tạo tài khoản', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text('Tạo tài khoản', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
                 ),
               ),
               const SizedBox(height: 30),
@@ -65,10 +63,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Đã có tài khoản? ', style: TextStyle(color: AppTheme.greyColor)),
+                  Text('Đã có tài khoản? ', style: TextStyle(color: AppTheme.greyColor)),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Text('Đăng nhập', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                    child: Text('Đăng nhập', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
                   ),
                 ],
               )
@@ -83,7 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+        Text(label, style: TextStyle(fontWeight: FontWeight.bold, )),
         const SizedBox(height: 8),
         TextField(
           obscureText: isPassword && _obscurePassword,

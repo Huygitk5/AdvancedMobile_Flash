@@ -6,25 +6,24 @@ import '../../data/mock_data.dart';
 
 class QuizReviewScreen extends StatelessWidget {
   final QuizResult result;
+  final List<QuizReviewItem> reviewData;
 
-  const QuizReviewScreen({Key? key, required this.result}) : super(key: key);
+  const QuizReviewScreen({Key? key, required this.result, required this.reviewData}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Kết quả bài làm', style: TextStyle(color: Color(0xFF1E293B), fontSize: 18, fontWeight: FontWeight.bold)),
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E293B), size: 20), onPressed: () => Navigator.pop(context)),
-        backgroundColor: Colors.white,
+        title: Text('Kết quả bài làm', style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new,  size: 20), onPressed: () => Navigator.pop(context)),
         elevation: 0,
         centerTitle: true,
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(20),
-        itemCount: MockData.mockReviewData.length,
+        itemCount: reviewData.length, // Đổi từ MockData.mockReviewData.length sang reviewData.length
         itemBuilder: (context, index) {
-          final data = MockData.mockReviewData[index];
+          final data = reviewData[index]; // Đổi từ MockData.mockReviewData[index]
           return _QuestionReviewCard(
             questionIndex: index + 1,
             data: data,
@@ -78,20 +77,20 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: mainThemeColor,
-                child: Text('${widget.questionIndex}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                child: Text('${widget.questionIndex}', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 14, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   widget.data.question,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, ),
                 ),
               ),
               const SizedBox(width: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Row(
@@ -209,7 +208,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
               padding: const EdgeInsets.only(top: 8.0, left: 28.0),
               child: Text(
                 widget.data.explanation,
-                style: const TextStyle(color: Color(0xFF1E293B), fontSize: 14, height: 1.5),
+                style: TextStyle( fontSize: 14, height: 1.5),
               ),
             )
                 : const SizedBox.shrink(),
