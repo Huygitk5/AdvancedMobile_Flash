@@ -120,10 +120,10 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
 
   Widget _buildFilters() {
     final items = <(StatsRange, String)>[
+      (StatsRange.all, tr('Tất cả')),
       (StatsRange.week, tr('Tuần')),
       (StatsRange.month, tr('Tháng')),
       (StatsRange.year, tr('Năm')),
-      (StatsRange.all, tr('Tất cả')),
       (StatsRange.custom, tr('Tùy chọn')),
     ];
     final isDark = Theme.of(context).brightness == Brightness.dark;
