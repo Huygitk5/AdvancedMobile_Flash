@@ -1,27 +1,34 @@
+/// Một lần làm quiz (dòng `quiz_attempts`). `id` = attemptId do client sinh.
 class QuizResult {
   final String id;
-  final String userId;
-  final String topicId;
+  final String quizId;
+  final String quizTitle;
+  final int totalQuestions;
   final int correctAnswers;
   final int wrongAnswers;
-  final int timeTakenSeconds; // Thời gian làm bài tính bằng giây
-  final List<String> wrongQuestionIds; // Danh sách ID các câu sai để review lại
+  final int scorePercent;
+  final int passScorePercent;
+  final int timeTakenSeconds;
 
-  QuizResult({
-    required this.id, required this.userId, required this.topicId,
-    required this.correctAnswers, required this.wrongAnswers,
-    required this.timeTakenSeconds, required this.wrongQuestionIds
+  /// null = server chưa chấm (đang chờ đồng bộ).
+  final int? xpAwarded;
+  final DateTime submittedAt;
+  final bool isSynced;
+
+  const QuizResult({
+    required this.id,
+    required this.quizId,
+    this.quizTitle = '',
+    required this.totalQuestions,
+    required this.correctAnswers,
+    required this.wrongAnswers,
+    required this.scorePercent,
+    this.passScorePercent = 70,
+    required this.timeTakenSeconds,
+    this.xpAwarded,
+    required this.submittedAt,
+    this.isSynced = false,
   });
 
-  factory QuizResult.fromJson(Map<String, dynamic> json) {
-    return QuizResult(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      topicId: json['topicId'] ?? '',
-      correctAnswers: json['correctAnswers'] ?? 0,
-      wrongAnswers: json['wrongAnswers'] ?? 0,
-      timeTakenSeconds: json['timeTakenSeconds'] ?? 0,
-      wrongQuestionIds: List<String>.from(json['wrongQuestionIds'] ?? []),
-    );
-  }
+  bool get passed => scorePercent >= passScorePercent;
 }

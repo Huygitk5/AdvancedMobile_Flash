@@ -24,6 +24,12 @@ public interface UserInventoryRepository extends JpaRepository<UserInventory, UU
             + "and i.userId = :userId and i.isEquipped = true and r.itemType = :type")
     List<UserInventory> findEquippedByType(@Param("userId") UUID userId, @Param("type") RewardItemType type);
 
+    /** Mỗi phần tử: [userId, image_url] của ảnh đại diện (AVATAR) đang trang bị. */
+    @Query("select i.userId, r.imageUrl from UserInventory i, RewardItem r where r.id = i.rewardItemId "
+            + "and i.userId in :userIds and i.isEquipped = true and r.itemType = com.flash.gamification.entity.RewardItemType.AVATAR "
+            + "and r.imageUrl is not null")
+    List<Object[]> findEquippedAvatars(@Param("userIds") Collection<UUID> userIds);
+
     /** Mỗi phần tử: [userId, border_colors JSON] của viền đang trang bị. */
     @Query("select i.userId, r.borderColors from UserInventory i, RewardItem r where r.id = i.rewardItemId "
             + "and i.userId in :userIds and i.isEquipped = true and r.itemType = com.flash.gamification.entity.RewardItemType.BORDER")

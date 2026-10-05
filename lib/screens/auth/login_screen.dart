@@ -1,177 +1,187 @@
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
-import '../main/main_screen.dart';
-import '../admin/admin_main_screen.dart'; // Thêm import màn hình Admin
-import 'register_screen.dart';
-import 'forgot_password_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+import '../../core/l10n.dart';
+import '../../core/theme.dart';
+import '../../core/utils.dart';
+import '../../data/remote/api_exception.dart';
+import '../../providers/providers.dart';
+import '../../widgets/common.dart';
+import 'forgot_password_screen.dart';
+import 'google_sign_in_helper.dart';
+import 'register_screen.dart';
+import 'verify_email_screen.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _obscurePassword = true;
-  bool _isAdminLogin = false; // Biến lưu trạng thái chọn User/Admin
+  bool _busy = false;
+  bool _googleBusy = false;
+  bool _isAdminLogin = false; // Tab đang chọn: Học viên / Quản trị viên
 
-  void _handleGoogleSignIn() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang kết nối Google...')),
-    );
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
-    });
+  @override
+  void initState() {
+    super.initState();
+    _email.text = ref.read(appPrefsProvider).lastLoginEmail ?? '';
   }
 
-  void _handleLogin() {
-    // Xử lý chuyển hướng dựa trên Role được chọn
-    if (_isAdminLogin) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminMainScreen()));
-    } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainScreen()));
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (!isEmail(email)) {
+      showAppSnack(context, tr('Email không hợp lệ'), error: true);
+      return;
+    }
+    if (password.isEmpty) {
+      showAppSnack(context, tr('Vui lòng nhập mật khẩu'), error: true);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final deviceId = await ref.read(secureStoreProvider).deviceId();
+      final auth = await ref.read(authApiProvider).login(email: email, password: password, deviceId: deviceId);
+      if (!mounted) return;
+      await completeSignIn(context, ref, auth, expectAdmin: _isAdminLogin);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'EMAIL_NOT_VERIFIED') {
+        // Mật khẩu đúng nhưng chưa xác thực email: server vừa gửi lại OTP, mở màn nhập mã.
+        setState(() => _busy = false);
+        Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: email)));
+        return;
+      }
+      showAppSnack(context, e.userMessage, error: true);
+    } catch (e) {
+      if (mounted) showAppSnack(context, errorMessage(e), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
+        // Là màn gốc (đã xem Welcome) thì không có nút back: bấm sẽ thoát app.
+        leading: canPop
+            ? IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context))
+            : null,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Đăng nhập', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+              Text(tr('Đăng nhập'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
               const SizedBox(height: 10),
-              Text('Chào mừng trở lại! Hãy tiếp tục hành trình của bạn.', style: TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
-              const SizedBox(height: 30),
+              Text(tr('Chào mừng trở lại! Hãy tiếp tục hành trình của bạn.'),
+                  textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.greyColor, fontSize: 15, height: 1.5)),
+              const SizedBox(height: 28),
 
               // UI CHỌN QUYỀN (USER / ADMIN)
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF4F6FA),
+                  color: isDark ? const Color(0xFF273449) : const Color(0xFFF4F6FA),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isAdminLogin = false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: !_isAdminLogin ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: !_isAdminLogin ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
-                          ),
-                          child: Center(
-                            child: Text('Học viên', style: TextStyle(fontWeight: FontWeight.bold, color: !_isAdminLogin ? AppTheme.primaryColor : AppTheme.greyColor)),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isAdminLogin = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: _isAdminLogin ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: _isAdminLogin ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
-                          ),
-                          child: Center(
-                            child: Text('Quản trị viên', style: TextStyle(fontWeight: FontWeight.bold, color: _isAdminLogin ? AppTheme.primaryColor : AppTheme.greyColor)),
-                          ),
-                        ),
-                      ),
-                    ),
+                    Expanded(child: _roleTab(tr('Học viên'), !_isAdminLogin, () => setState(() => _isAdminLogin = false))),
+                    Expanded(child: _roleTab(tr('Quản trị viên'), _isAdminLogin, () => setState(() => _isAdminLogin = true))),
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-
-              _buildTextField('Email', Icons.email_outlined, hint: 'Nhập email của bạn'),
-              const SizedBox(height: 20),
-              _buildTextField('Mật khẩu', Icons.lock_outline, isPassword: true),
-
+              const SizedBox(height: 26),
+              AppTextField(
+                label: 'Email',
+                icon: Icons.email_outlined,
+                controller: _email,
+                hint: tr('Nhập email của bạn'),
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 18),
+              AppTextField(
+                label: tr('Mật khẩu'),
+                icon: Icons.lock_outline,
+                controller: _password,
+                obscure: _obscurePassword,
+                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                onSubmitted: (_) => _handleLogin(),
+              ),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()));
-                  },
-                  child: Text('Quên mật khẩu?', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => ForgotPasswordScreen(initialEmail: _email.text.trim()))),
+                  child: Text(tr('Quên mật khẩu?'), style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  onPressed: _handleLogin, // Gọi hàm xử lý phân quyền
-                  child: Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
-                ),
-              ),
-              const SizedBox(height: 30),
-
+              const SizedBox(height: 12),
+              PrimaryButton(label: tr('Đăng nhập'), loading: _busy, onPressed: _googleBusy ? null : _handleLogin),
+              const SizedBox(height: 26),
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey.shade300)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('Hoặc', style: TextStyle(color: AppTheme.greyColor)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(tr('Hoặc'), style: const TextStyle(color: AppTheme.greyColor)),
                   ),
                   Expanded(child: Divider(color: Colors.grey.shade300)),
                 ],
               ),
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: Colors.grey.shade300),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  onPressed: _handleGoogleSignIn,
-                  icon: Icon(Icons.g_mobiledata, color: Colors.red, size: 32),
-                  label: Text('Tiếp tục với Google', style: TextStyle( fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 26),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
+                onPressed: (_busy || _googleBusy)
+                    ? null
+                    : () => signInWithGoogle(context, ref, (b) => setState(() => _googleBusy = b), expectAdmin: _isAdminLogin),
+                icon: _googleBusy
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : const Icon(Icons.g_mobiledata, color: Colors.red, size: 32),
+                label: Text(tr('Tiếp tục với Google'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 30),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Chưa có tài khoản? ', style: TextStyle(color: AppTheme.greyColor)),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
-                    },
-                    child: Text('Đăng ký ngay', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              )
+              // Tài khoản quản trị do admin tạo, không tự đăng ký.
+              if (!_isAdminLogin) ...[
+                const SizedBox(height: 26),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    Text('${tr('Chưa có tài khoản?')} ', style: const TextStyle(color: AppTheme.greyColor)),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                      child: Text(tr('Đăng ký ngay'), style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -179,32 +189,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField(String label, IconData icon, {bool isPassword = false, String? hint}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, )),
-        const SizedBox(height: 8),
-        TextField(
-          obscureText: isPassword && _obscurePassword,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon, color: AppTheme.greyColor),
-            suffixIcon: isPassword
-                ? IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: AppTheme.greyColor),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            )
-                : null,
-            filled: true,
-            fillColor: const Color(0xFFF4F6FA),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
-            ),
-          ),
+  Widget _roleTab(String label, bool selected, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: _busy || _googleBusy ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? (isDark ? const Color(0xFF1E293B) : Colors.white) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: selected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5)] : null,
         ),
-      ],
+        child: Center(
+          child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? AppTheme.primaryColor : AppTheme.greyColor)),
+        ),
+      ),
     );
   }
 }

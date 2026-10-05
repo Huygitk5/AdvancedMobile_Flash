@@ -1,6 +1,7 @@
 package com.flash.auth.mail;
 
 import com.flash.auth.AuthProperties;
+import com.flash.auth.entity.OtpPurpose;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,25 +29,48 @@ public class MailOtpSender implements OtpSender {
     }
 
     @Override
-    public void sendPasswordResetOtp(String email, String fullName, String otp) {
+    public void sendOtp(String email, String fullName, OtpPurpose purpose, String otp) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
-            log.info("[DEV - chưa cấu hình SMTP] OTP đặt lại mật khẩu cho {}: {}", email, otp);
+            log.info("[DEV - chưa cấu hình SMTP] OTP {} cho {}: {}", purpose, email, otp);
             return;
         }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(email);
-        message.setSubject("Flash English - Mã đặt lại mật khẩu");
+        message.setSubject("Flash English - " + subject(purpose));
         message.setText("Xin chào " + fullName + ",\n\n"
-                + "Mã OTP đặt lại mật khẩu của bạn là: " + otp + "\n"
-                + "Mã có hiệu lực trong " + authProperties.getOtpTtl().toMinutes() + " phút.\n\n"
-                + "Nếu bạn không yêu cầu, hãy bỏ qua email này.");
+                + intro(purpose) + otp + "\n"
+                + "Mã có hiệu lực trong " + authProperties.getOtpTtl().toMinutes() + " phút. "
+                + "Không chia sẻ mã này cho bất kỳ ai.\n\n"
+                + "Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email này.");
         try {
             sender.send(message);
         } catch (MailException e) {
-            // Không ném lỗi ra API: forgot-password luôn trả 200 để không lộ email có tồn tại hay không
+            // Không ném lỗi ra API: các endpoint gửi OTP luôn trả 200 để không lộ email có tồn tại hay không
             log.error("Gửi email OTP tới {} thất bại: {}", email, e.getMessage());
+        }
+    }
+
+    private static String subject(OtpPurpose purpose) {
+        switch (purpose) {
+            case EMAIL_VERIFY:
+                return "Mã xác thực email";
+            case CHANGE_PASSWORD:
+                return "Mã xác nhận đổi mật khẩu";
+            default:
+                return "Mã đặt lại mật khẩu";
+        }
+    }
+
+    private static String intro(OtpPurpose purpose) {
+        switch (purpose) {
+            case EMAIL_VERIFY:
+                return "Mã OTP xác thực email đăng ký tài khoản của bạn là: ";
+            case CHANGE_PASSWORD:
+                return "Mã OTP xác nhận đổi mật khẩu của bạn là: ";
+            default:
+                return "Mã OTP đặt lại mật khẩu của bạn là: ";
         }
     }
 }

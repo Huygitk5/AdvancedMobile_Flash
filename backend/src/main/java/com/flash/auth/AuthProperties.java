@@ -22,4 +22,10 @@ public class AuthProperties {
 
     /** Số request /v1/auth/** tối đa mỗi phút cho mỗi (IP, endpoint). */
     private int rateLimitPerMinute = 20;
+
+    /**
+     * Bật xác thực email bằng OTP: đăng ký phải nhập mã gửi qua email mới kích hoạt tài khoản,
+     * và đổi mật khẩu phải nhập thêm mã OTP gửi tới email.
+     */
+    private boolean requireEmailVerification = true;
 }
