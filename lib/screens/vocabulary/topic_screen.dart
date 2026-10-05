@@ -28,7 +28,7 @@ class TopicScreen extends ConsumerWidget {
         appBar: AppBar(
           automaticallyImplyLeading: Navigator.of(context).canPop(),
           elevation: 0,
-          title: Text(tr('Học tập'), style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(tr('Học tập'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           bottom: TabBar(
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: AppTheme.greyColor,
