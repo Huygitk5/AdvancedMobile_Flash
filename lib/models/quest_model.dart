@@ -1,34 +1,31 @@
-import 'package:flutter/material.dart';
-
+/// Nhiệm vụ của user trong kỳ hiện tại (`user_quests` ⨝ `quest_definitions`).
 class Quest {
   final String id;
+  final String questDefinitionId;
   final String title;
+
+  /// Tên icon từ server; UI gọi `iconFor(iconName)`.
+  final String iconName;
   final int current;
   final int target;
   final int xp;
-  bool isClaimed; // Có thể thay đổi
-  final IconData icon; // Tạm thời dùng IconData, sau này có API sẽ map từ String
+  final bool isClaimed;
 
-  Quest({
+  /// 'YYYY-MM-DD'
+  final String periodStart;
+
+  const Quest({
     required this.id,
+    required this.questDefinitionId,
     required this.title,
+    required this.iconName,
     required this.current,
     required this.target,
     required this.xp,
     required this.isClaimed,
-    required this.icon,
+    required this.periodStart,
   });
 
-  // Sẵn sàng cho Backend API
-  factory Quest.fromJson(Map<String, dynamic> json) {
-    return Quest(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      current: json['current'] ?? 0,
-      target: json['target'] ?? 1,
-      xp: json['xp'] ?? 0,
-      isClaimed: json['isClaimed'] ?? false,
-      icon: Icons.star, // Map icon thật từ API sau
-    );
-  }
+  bool get isCompleted => current >= target;
+  double get progress => target <= 0 ? 0 : (current / target).clamp(0.0, 1.0);
 }

@@ -8,7 +8,7 @@ import '../profile/profile_screen.dart';
 import 'dart:ui';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -91,7 +91,7 @@ class _MainScreenState extends State<MainScreen> {
                               centerX: centerX,
                               bumpHeight: _bump,
                               halfWidth: halfWidth,
-                              color: Theme.of(context).cardColor.withOpacity(0.1),
+                              color: Theme.of(context).cardColor.withValues(alpha: 0.1),
                             ),
                           ),
                         ),
@@ -246,7 +246,7 @@ class _NavBarPainter extends CustomPainter {
     canvas.drawPath(
       path.shift(const Offset(0, -2)),
       Paint()
-        ..color = Colors.black.withOpacity(0.10)
+        ..color = Colors.black.withValues(alpha: 0.10)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
     canvas.restore();

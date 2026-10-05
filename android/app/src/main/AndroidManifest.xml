@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Gọi API backend (bản release cũng cần). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- connectivity_plus: biết khi nào có mạng lại để đồng bộ. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
-        android:label="flash"
+        android:label="Flash"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

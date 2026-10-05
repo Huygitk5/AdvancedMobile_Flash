@@ -1,22 +1,16 @@
+/// Một dòng `user_inventories` (DB local chỉ chứa 1 user nên không có userId).
 class UserInventory {
   final String id;
-  final String userId;
   final String rewardItemId;
-  bool isEquipped;
+  final bool isEquipped;
   final DateTime unlockedAt;
+  final DateTime? clientUpdatedAt;
 
-  UserInventory({
-    required this.id, required this.userId, required this.rewardItemId,
-    required this.isEquipped, required this.unlockedAt
+  const UserInventory({
+    required this.id,
+    required this.rewardItemId,
+    required this.isEquipped,
+    required this.unlockedAt,
+    this.clientUpdatedAt,
   });
-
-  factory UserInventory.fromJson(Map<String, dynamic> json) {
-    return UserInventory(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      rewardItemId: json['rewardItemId'] ?? '',
-      isEquipped: json['isEquipped'] ?? false,
-      unlockedAt: DateTime.parse(json['unlockedAt']),
-    );
-  }
 }

@@ -1,77 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/icons.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/reward_item_model.dart';
+import '../../models/lesson_model.dart';
+import '../../models/quest_model.dart';
+import '../../models/user_model.dart';
+import '../../providers/providers.dart';
+import '../../providers/user_providers.dart';
 import '../../widgets/reminder_dialog.dart';
-import '../vocabulary/topic_screen.dart';
-import '../flashcard/flashcard_screen.dart';
 import '../challenge/challenge_screen.dart';
+import '../flashcard/flashcard_screen.dart';
 import '../grammar/grammar_detail_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
-import '../profile/settings_screen.dart'; // THÊM IMPORT NÀY
+import '../profile/settings_screen.dart';
+import '../vocabulary/topic_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+/// Mọi số liệu đọc từ SQLite nên mở offline vẫn hiển thị đủ.
+class HomeScreen extends ConsumerStatefulWidget {
   final Function(int)? onSwitchTab;
-  const HomeScreen({Key? key, this.onSwitchTab}) : super(key: key);
+  const HomeScreen({super.key, this.onSwitchTab});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Lần đầu trong ngày chưa có nhiệm vụ local: online thì nhờ server giao.
+    ref.read(questRepositoryProvider).ensureToday();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final today = await ref.read(todayStatsProvider.future);
+      if (!mounted) return;
+      ReminderDialog.maybeShowDaily(context, ref.read(appPrefsProvider),
+          studiedToday: (today?.lessonsCompleted ?? 0) + (today?.cardsReviewed ?? 0) > 0);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(profileProvider).value;
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, 10 + MediaQuery.of(context).padding.bottom),          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 25),
-              _buildProgressSection(context),
-              const SizedBox(height: 25),
-              _buildSectionTitle('Danh mục học tập', context),
-              const SizedBox(height: 15),
-              _buildCategories(context),
-              const SizedBox(height: 25),
-              _buildSectionTitle('Bài học gợi ý cho bạn', context),
-              const SizedBox(height: 15),
-              _buildSuggestedLessons(context),
-              const SizedBox(height: 25),
-              _buildSectionTitle('Thử thách hôm nay', context),
-              const SizedBox(height: 15),
-              _buildChallengeSection(context),
-              const SizedBox(height: 25),
-              _buildLeaderboardBanner(context),
-              const SizedBox(height: 20),
-            ],
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(syncWorkerProvider).syncNow(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 10 + MediaQuery.of(context).padding.bottom),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context, user),
+                const SizedBox(height: 25),
+                _buildProgressSection(context),
+                const SizedBox(height: 25),
+                _buildSectionTitle('Danh mục học tập', context),
+                const SizedBox(height: 15),
+                _buildCategories(context),
+                const SizedBox(height: 25),
+                _buildSectionTitle('Bài học gợi ý cho bạn', context),
+                const SizedBox(height: 15),
+                _buildSuggestedLessons(context),
+                const SizedBox(height: 25),
+                _buildSectionTitle('Thử thách hôm nay', context),
+                const SizedBox(height: 15),
+                _buildChallengeSection(context),
+                const SizedBox(height: 25),
+                _buildLeaderboardBanner(context),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final user = MockData.currentUser;
+  void _openLesson(Lesson lesson) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => lesson.isVocabulary
+            ? FlashcardScreen(topicId: lesson.refId, topicTitle: lesson.title)
+            : GrammarDetailScreen(grammarId: lesson.refId, title: lesson.title),
+      ),
+    );
+  }
 
-    List<Color> getEquippedBorderColors() {
-      try {
-        final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'border');
-        final item = MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-        return item.borderColors.map((hex) => Color(hex)).toList();
-      } catch (e) {
-        return [const Color(0xFFE2E8F0), const Color(0xFFCBD5E1)];
-      }
-    }
-
-    RewardItem? getEquippedAvatar() {
-      try {
-        final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'avatar');
-        return MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-      } catch (e) {
-        return null;
-      }
-    }
-
-    final avatar = getEquippedAvatar();
-    List<Color> gradientColors = getEquippedBorderColors();
+  Widget _buildHeader(BuildContext context, UserModel? user) {
+    final gradientColors = (user?.equippedBorderColors.isNotEmpty ?? false)
+        ? user!.equippedBorderColors.map((c) => Color(c)).toList()
+        : const [Color(0xFFE2E8F0), Color(0xFFCBD5E1)];
+    final avatarUrl = user?.equippedAvatarUrl ?? user?.avatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
 
     return Column(
       children: [
@@ -79,40 +103,38 @@ class HomeScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: gradientColors.length == 1 ? [gradientColors.first, gradientColors.first] : gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle),
                 child: CircleAvatar(
                   radius: 20,
                   backgroundColor: const Color(0xFFEEF2FF),
-                  backgroundImage: (avatar != null && avatar.imageUrl != null && avatar.imageUrl!.isNotEmpty) ? NetworkImage(avatar.imageUrl!) as ImageProvider : null,
-                  child: (avatar == null || avatar.imageUrl == null || avatar.imageUrl!.isEmpty) ? const Icon(Icons.person, color: AppTheme.primaryColor) : null,
+                  backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                  child: hasAvatar ? null : const Icon(Icons.person, color: AppTheme.primaryColor),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                Text('${user.fullName} 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Xin chào,', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                  Text('${user?.fullName ?? ''} 👋',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
+                ],
+              ),
             ),
-            const Spacer(),
             IconButton(
               icon: Badge(smallSize: 8, backgroundColor: Colors.red, child: Icon(Icons.notifications_none, color: Theme.of(context).textTheme.bodyLarge?.color)),
-              onPressed: () => ReminderDialog.show(context),
+              onPressed: () => ReminderDialog.show(context, ref.read(appPrefsProvider), onStart: () => widget.onSwitchTab?.call(1)),
             ),
-            // ĐÃ BỌC NÚT CÀI ĐẶT BẰNG ICONBUTTON VÀ CHUYỂN TRANG
             IconButton(
               icon: Icon(Icons.settings_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                );
-              },
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
             ),
           ],
         ),
@@ -122,23 +144,26 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Expanded(child: Text('Hôm nay là một ngày tuyệt vời để học tiếng Anh!', style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4))),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(20)),
-              child: Row(
-                children: [
-                  const Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
-                  const SizedBox(width: 6),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${user.streakDays} ngày', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
-                      const Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
-                    ],
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, color: Colors.orange, size: 16),
-                ],
+            GestureDetector(
+              onTap: () => widget.onSwitchTab?.call(2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(20)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
+                    const SizedBox(width: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${user?.streakDays ?? 0} ngày', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 14)),
+                        const Text('Streak học tập', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right, color: Colors.orange, size: 16),
+                  ],
+                ),
               ),
             ),
           ],
@@ -148,6 +173,11 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildProgressSection(BuildContext context) {
+    final goal = ref.watch(appPrefsProvider).dailyGoalLessons;
+    final done = ref.watch(todayStatsProvider).value?.lessonsCompleted ?? 0;
+    final ratio = goal <= 0 ? 0.0 : (done / goal).clamp(0.0, 1.0);
+    final cont = ref.watch(homeLessonsProvider).value?.continueLesson;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -160,7 +190,10 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Tiến độ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
-              const Text('3/5 bài >', style: TextStyle(color: AppTheme.greyColor, fontWeight: FontWeight.bold)),
+              GestureDetector(
+                onTap: () => widget.onSwitchTab?.call(2),
+                child: Text('$done/$goal bài >', style: const TextStyle(color: AppTheme.greyColor, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
           const SizedBox(height: 15),
@@ -168,7 +201,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: LinearProgressIndicator(
-                  value: 0.6,
+                  value: ratio,
                   backgroundColor: Colors.grey.shade200,
                   color: AppTheme.primaryColor,
                   minHeight: 10,
@@ -176,14 +209,12 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-              const Text('60%', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
+              Text('${(ratio * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor)),
             ],
           ),
           const SizedBox(height: 20),
           GestureDetector(
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const FlashcardScreen(topicTitle: 'Business Vocabulary')));
-            },
+            onTap: () => cont != null ? _openLesson(cont) : widget.onSwitchTab?.call(1),
             child: Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
@@ -201,12 +232,20 @@ class HomeScreen extends StatelessWidget {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Tiếp tục học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                        SizedBox(height: 4),
-                        Text('Business Vocabulary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
-                        SizedBox(height: 4),
-                        Text('Bài 12/20 • 8 phút', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                      children: [
+                        Text(cont != null ? 'Tiếp tục học' : 'Bắt đầu học', style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text(cont?.title ?? 'Chọn một chủ đề từ vựng',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                        const SizedBox(height: 4),
+                        Text(
+                          cont != null
+                              ? '${(cont.progress * cont.itemCount).round()}/${cont.itemCount} từ • ${cont.estimatedMinutes} phút'
+                              : 'Mở tab Học để chọn bài',
+                          style: const TextStyle(color: AppTheme.greyColor, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),
@@ -225,11 +264,12 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategories(BuildContext context) {
+    final words = ref.watch(contentCountsProvider).value?.words ?? 0;
     return Row(
       children: [
         Expanded(
           child: _buildCategoryCard(
-            context, 'Từ vựng', 'Hơn 2000+ từ', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green,
+            context, 'Từ vựng', words > 0 ? '$words từ' : 'Chủ đề từ vựng', Icons.menu_book, const Color(0xFFE8F5E9), Colors.green,
                 () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TopicScreen(initialIndex: 0))),
           ),
         ),
@@ -278,29 +318,32 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildSuggestedLessons(BuildContext context) {
+    final lessons = ref.watch(homeLessonsProvider).value?.recommended ?? const <Lesson>[];
+    if (lessons.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Text('Bạn đã bắt đầu mọi bài học. Tuyệt vời!', style: TextStyle(color: AppTheme.greyColor)),
+      );
+    }
     return SizedBox(
       height: 220,
       child: ListView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
-        children: MockData.suggestedLessons.map((lesson) {
+        children: lessons.map((lesson) {
           return Padding(
             padding: const EdgeInsets.only(right: 15.0),
             child: _buildLessonCard(
-                context,
-                lesson.title,
-                lesson.level,
-                lesson.progress,
-                lesson.itemCounts,
-                lesson.estimatedTime,
-                lesson.imageBg,
-                    () {
-                  if (lesson.type == 'vocabulary') {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: lesson.title)));
-                  } else if (lesson.type == 'grammar') {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: lesson.title)));
-                  }
-                }
+              context,
+              lesson.title,
+              lesson.level,
+              lesson.progress,
+              lesson.isVocabulary ? '${lesson.itemCount} từ' : 'Ngữ pháp',
+              '${lesson.estimatedMinutes} phút',
+              lesson.coverColor != null
+                  ? Color(lesson.coverColor!)
+                  : (lesson.isVocabulary ? Colors.blue.shade100 : Colors.purple.shade100),
+              () => _openLesson(lesson),
             ),
           );
         }).toList(),
@@ -328,7 +371,7 @@ class HomeScreen extends StatelessWidget {
                     color: imageBg,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  child: Center(child: Icon(Icons.image, color: Theme.of(context).cardColor.withOpacity(0.54), size: 40)),
+                  child: Center(child: Icon(Icons.image, color: Theme.of(context).cardColor.withValues(alpha: 0.54), size: 40)),
                 ),
                 Positioned(
                   top: 10,
@@ -349,7 +392,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color)),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -388,6 +431,8 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildChallengeSection(BuildContext context) {
+    final quests = ref.watch(questsProvider).value ?? const <Quest>[];
+    final quest = quests.where((q) => !q.isClaimed).firstOrNull;
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -399,16 +444,20 @@ class HomeScreen extends StatelessWidget {
           CircleAvatar(
             backgroundColor: Colors.amber,
             radius: 24,
-            child: Icon(Icons.emoji_events, color: Theme.of(context).cardColor, size: 28),
+            child: Icon(quest == null ? Icons.emoji_events : iconFor(quest.iconName), color: Theme.of(context).cardColor, size: 28),
           ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Hoàn thành bài kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
-                SizedBox(height: 4),
-                Text('Kiểm tra kiến thức sau bài học', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+              children: [
+                Text(quest?.title ?? 'Đã hoàn thành mọi thử thách',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                const SizedBox(height: 4),
+                Text(
+                  quest == null ? 'Quay lại vào ngày mai nhé!' : 'Tiến độ ${quest.current}/${quest.target} • +${quest.xp} XP',
+                  style: const TextStyle(color: AppTheme.greyColor, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -419,13 +468,13 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () {
-              if (onSwitchTab != null) {
-                onSwitchTab!(3);
+              if (widget.onSwitchTab != null) {
+                widget.onSwitchTab!(3);
               } else {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const ChallengeScreen()));
               }
             },
-            child: Text('Bắt đầu', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 12)),
+            child: Text(quest != null && quest.isCompleted ? 'Nhận' : 'Bắt đầu', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 12)),
           )
         ],
       ),
@@ -434,12 +483,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildLeaderboardBanner(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const LeaderboardScreen()),
-        );
-      },
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LeaderboardScreen())),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -451,7 +495,7 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.3),
+              color: Colors.orange.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -462,7 +506,7 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardColor.withOpacity(0.2),
+                color: Theme.of(context).cardColor.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.emoji_events, color: Theme.of(context).cardColor, size: 30),
@@ -474,7 +518,7 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   const Text('Top 10 Vinh Danh', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text('Xem vị trí của bạn trên bảng xếp hạng', style: TextStyle(color: Theme.of(context).cardColor.withOpacity(0.9), fontSize: 12)),
+                  Text('Xem vị trí của bạn trên bảng xếp hạng', style: TextStyle(color: Theme.of(context).cardColor.withValues(alpha: 0.9), fontSize: 12)),
                 ],
               ),
             ),

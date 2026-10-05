@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme.dart';
-import '../../models/quiz_result_model.dart';
 import '../../models/quiz_review_model.dart';
-import '../../data/mock_data.dart';
+import '../../providers/content_providers.dart';
 
-class QuizReviewScreen extends StatelessWidget {
-  final QuizResult result;
-  final List<QuizReviewItem> reviewData;
+/// Dựng từ `quiz_attempt_answers` ⨝ `quiz_questions` (đọc được offline).
+class QuizReviewScreen extends ConsumerWidget {
+  final String attemptId;
 
-  const QuizReviewScreen({Key? key, required this.result, required this.reviewData}) : super(key: key);
+  const QuizReviewScreen({super.key, required this.attemptId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(quizReviewProvider(attemptId));
     return Scaffold(
       appBar: AppBar(
-        title: Text('Kết quả bài làm', style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new,  size: 20), onPressed: () => Navigator.pop(context)),
+        title: const Text('Kết quả bài làm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
         elevation: 0,
         centerTitle: true,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: reviewData.length, // Đổi từ MockData.mockReviewData.length sang reviewData.length
-        itemBuilder: (context, index) {
-          final data = reviewData[index]; // Đổi từ MockData.mockReviewData[index]
-          return _QuestionReviewCard(
-            questionIndex: index + 1,
-            data: data,
-          );
-        },
+      body: items.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Không đọc được bài làm: $e')),
+        data: (reviewData) => ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: reviewData.length,
+          itemBuilder: (context, index) => _QuestionReviewCard(questionIndex: index + 1, data: reviewData[index]),
+        ),
       ),
     );
   }
@@ -38,7 +38,7 @@ class _QuestionReviewCard extends StatefulWidget {
   final int questionIndex;
   final QuizReviewItem data; // Sử dụng Model QuizReviewItem
 
-  const _QuestionReviewCard({Key? key, required this.questionIndex, required this.data}) : super(key: key);
+  const _QuestionReviewCard({required this.questionIndex, required this.data});
 
   @override
   State<_QuestionReviewCard> createState() => _QuestionReviewCardState();
@@ -52,7 +52,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
   Widget build(BuildContext context) {
     final int correctIndex = widget.data.correctIndex;
     final int userIndex = widget.data.userIndex;
-    final bool isCorrect = correctIndex == userIndex;
+    final bool isCorrect = widget.data.isCorrect;
 
     // Màu sắc chủ đạo của thẻ
     final Color cardBgColor = isCorrect ? const Color(0xFFEDF7ED) : const Color(0xFFFDEDED);
@@ -108,7 +108,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
 
           // 2. Danh sách 4 đáp án
           ...List.generate(4, (index) {
-            final String optionText = widget.data.options[index];
+            final String optionText = index < widget.data.options.length ? widget.data.options[index] : '';
             final bool isSelected = index == userIndex;
             final bool isActualCorrect = index == correctIndex;
 

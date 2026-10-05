@@ -1,10 +1,44 @@
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
-import '../splash/welcome_screen.dart';
-import '../../data/mock_data.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
-  const AdminDashboardScreen({Key? key}) : super(key: key);
+import '../../core/theme.dart';
+import '../../providers/auth_providers.dart';
+import '../../providers/providers.dart';
+import 'admin_common.dart';
+
+typedef _DashboardStats = ({int users, int topics, int words, int items});
+
+class AdminDashboardScreen extends ConsumerStatefulWidget {
+  const AdminDashboardScreen({super.key});
+
+  @override
+  ConsumerState<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
+  Future<_DashboardStats>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() => setState(() { _future = _fetch(); });
+
+  Future<_DashboardStats> _fetch() async {
+    final api = ref.read(adminApiProvider);
+    final results = await Future.wait([api.users(size: 1), api.topics(size: 100), api.rewardItems()]);
+    final users = results[0] as dynamic;
+    final topics = results[1] as dynamic;
+    final items = results[2] as List;
+    return (
+      users: users.totalElements as int,
+      topics: topics.totalElements as int,
+      words: (topics.items as List).fold<int>(0, (a, t) => a + (t.totalWords as int)),
+      items: items.length,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,39 +46,26 @@ class AdminDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor, elevation: 0, automaticallyImplyLeading: false,
         title: Text('Tổng quan hệ thống', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 20, fontWeight: FontWeight.bold)),
-        actions: [IconButton(icon: Icon(Icons.logout, color: Theme.of(context).cardColor), onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const WelcomeScreen()), (route) => false))],
+        actions: [
+          IconButton(icon: Icon(Icons.refresh, color: Theme.of(context).cardColor), onPressed: _load),
+          // StartGate đưa về màn đăng nhập.
+          IconButton(icon: Icon(Icons.logout, color: Theme.of(context).cardColor), onPressed: () => ref.read(authStateProvider.notifier).logout()),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GridView.count(
-              physics: const NeverScrollableScrollPhysics(), shrinkWrap: true, crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 1.3,
-              children: [
-                _buildStatCard(context, 'Học viên', '${MockData.users.length}', Icons.people, const [Color(0xFF4FACFE), Color(0xFF00F2FE)]),
-                _buildStatCard(context, 'Chủ đề', '${MockData.vocabularyTopics.length}', Icons.library_books, const [Color(0xFF43E97B), Color(0xFF38F9D7)]),
-                _buildStatCard(context, 'Từ vựng', '${MockData.flashcards.length}', Icons.style, const [Color(0xFFFA709A), Color(0xFFFEE140)]),
-                _buildStatCard(context, 'Vật phẩm', '${MockData.shopItems.length}', Icons.storefront, const [Color(0xFFF6D365), Color(0xFFFDA085)]),
-              ],
-            ),
-            const SizedBox(height: 30),
-            Text('Hoạt động gần đây', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
-            const SizedBox(height: 15),
-            Container(
-              decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]),
-              child: ListView.separated(
-                physics: const NeverScrollableScrollPhysics(), shrinkWrap: true,
-                itemCount: 4,
-                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF4F6FA)),
-                itemBuilder: (context, index) => ListTile(
-                  leading: CircleAvatar(backgroundColor: Colors.blue.shade50, child: Icon(Icons.person_add, color: AppTheme.primaryColor)),
-                  title: Text('Người dùng mới đăng ký', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color)),
-                  subtitle: Text('10 phút trước', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                ),
-              ),
-            )
-          ],
+      body: AdminAsync<_DashboardStats>(
+        future: _future,
+        onRetry: _load,
+        builder: (s) => SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: GridView.count(
+            physics: const NeverScrollableScrollPhysics(), shrinkWrap: true, crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 1.3,
+            children: [
+              _buildStatCard(context, 'Học viên', '${s.users}', Icons.people, const [Color(0xFF4FACFE), Color(0xFF00F2FE)]),
+              _buildStatCard(context, 'Chủ đề', '${s.topics}', Icons.library_books, const [Color(0xFF43E97B), Color(0xFF38F9D7)]),
+              _buildStatCard(context, 'Từ vựng', '${s.words}', Icons.style, const [Color(0xFFFA709A), Color(0xFFFEE140)]),
+              _buildStatCard(context, 'Vật phẩm', '${s.items}', Icons.storefront, const [Color(0xFFF6D365), Color(0xFFFDA085)]),
+            ],
+          ),
         ),
       ),
     );
@@ -56,7 +77,7 @@ class AdminDashboardScreen extends StatelessWidget {
       decoration: BoxDecoration(
           gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: gradient[0].withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 5))]
+          boxShadow: [BoxShadow(color: gradient[0].withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 5))]
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

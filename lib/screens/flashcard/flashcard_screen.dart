@@ -1,72 +1,126 @@
 import 'dart:math'; // Import thêm thư viện toán học để dùng hằng số pi
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
-import '../../models/flashcard_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/clock.dart';
 import '../../core/theme.dart';
+import '../../models/flashcard_model.dart';
+import '../../providers/content_providers.dart';
+import '../../providers/providers.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/vocabulary_bottom_sheet.dart';
 import '../home/completion_screen.dart';
+import '../quiz/quiz_screen.dart';
 
-class FlashcardScreen extends StatefulWidget {
+class FlashcardScreen extends ConsumerStatefulWidget {
+  final String topicId;
   final String topicTitle;
 
-  const FlashcardScreen({Key? key, required this.topicTitle}) : super(key: key);
+  const FlashcardScreen({super.key, required this.topicId, required this.topicTitle});
 
   @override
-  State<FlashcardScreen> createState() => _FlashcardScreenState();
+  ConsumerState<FlashcardScreen> createState() => _FlashcardScreenState();
 }
 
-class _FlashcardScreenState extends State<FlashcardScreen> {
+class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
   int currentIndex = 0;
   bool isFlipped = false;
 
+  /// Thứ tự thẻ chốt lúc mở màn (thẻ đến hạn trước). Danh sách từ SQLite vẫn được watch để cập nhật
+  /// ghi chú / bookmark, nhưng không đảo thứ tự khi box thay đổi giữa buổi học.
+  List<String>? _order;
+  Map<String, Flashcard> _cards = const {};
+  final Set<String> _reviewed = {};
+  final DateTime _startedAt = Clock.now();
+  DateTime _shownAt = Clock.now();
+  bool _busy = false;
+
+  int get _count => _order?.length ?? 0;
+  Flashcard? get _current => _count == 0 ? null : _cards[_order![currentIndex]];
+
+  void _goTo(int index) {
+    setState(() {
+      currentIndex = index;
+      isFlipped = false;
+      _shownAt = Clock.now();
+    });
+  }
+
   void _nextCard() {
-    if (currentIndex < MockData.flashcards.length - 1) {
-      setState(() {
-        currentIndex++;
-        isFlipped = false;
-      });
-    } else {
-      // Điều hướng tới Màn hình Hoàn thành bài học
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CompletionScreen()),
-      );
-    }
+    if (currentIndex < _count - 1) _goTo(currentIndex + 1);
   }
 
   void _prevCard() {
-    if (currentIndex > 0) {
-      setState(() {
-        currentIndex--;
-        isFlipped = false;
-      });
-    }
+    if (currentIndex > 0) _goTo(currentIndex - 1);
   }
 
   void _flipCard() {
     setState(() {
       isFlipped = !isFlipped;
+      // responseTimeMs đo từ lúc lật thẻ tới lúc bấm Again / Know.
+      if (isFlipped) _shownAt = Clock.now();
     });
   }
 
+  /// Again / Know: ghi lạc quan + enqueue FLASHCARD_REVIEW, rồi sang thẻ tiếp; thẻ cuối -> hoàn thành bài.
+  Future<void> _rate(String rating) async {
+    final card = _current;
+    if (card == null || _busy) return;
+    _busy = true;
+    try {
+      final responseMs = Clock.now().difference(_shownAt).inMilliseconds.clamp(0, 3600000);
+      await ref.read(srsRepositoryProvider).rate(card, rating, responseTimeMs: responseMs);
+      _reviewed.add(card.id);
+      if (!mounted) return;
+      if (currentIndex < _count - 1) {
+        _goTo(currentIndex + 1);
+      } else {
+        await _finishLesson();
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _finishLesson() async {
+    final r = await ref.read(lessonRepositoryProvider).completeTopic(
+          widget.topicId,
+          cardsReviewed: _reviewed.length,
+          durationSeconds: Clock.now().difference(_startedAt).inSeconds,
+        );
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CompletionScreen(
+          lessonCompletionId: r.id,
+          xpEstimate: r.xpEstimate,
+          topicId: widget.topicId,
+        ),
+      ),
+    );
+  }
+
   void _showNoteDialog(Flashcard card) {
-    // Khởi tạo controller với nội dung ghi chú cũ (nếu có)
-    TextEditingController noteController = TextEditingController(text: card.note);
+    final noteController = TextEditingController(text: card.note);
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
             'Ghi chú cho "${card.word}"',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
         ),
         content: TextField(
           controller: noteController,
           maxLines: 4, // Ô nhập liệu rộng 4 dòng
+          maxLength: 5000,
           decoration: InputDecoration(
             hintText: 'Nhập mẹo nhớ, ngữ cảnh sử dụng...',
-            hintStyle: TextStyle(color: AppTheme.greyColor, fontSize: 14),
+            hintStyle: const TextStyle(color: AppTheme.greyColor, fontSize: 14),
             filled: true,
             fillColor: const Color(0xFFF4F6FA),
             border: OutlineInputBorder(
@@ -76,9 +130,17 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           ),
         ),
         actions: [
+          if (card.hasNote)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                ref.read(noteRepositoryProvider).delete(card.id);
+              },
+              child: const Text('Xoá', style: TextStyle(color: Colors.red)),
+            ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Hủy', style: TextStyle(color: AppTheme.greyColor)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -86,13 +148,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
             onPressed: () {
-              // Cập nhật lại note vào object Flashcard và reload UI
-              setState(() {
-                card.note = noteController.text.trim();
-              });
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+              // Ghi SQLite + NOTE_UPSERT; danh sách thẻ đang watch nên tự hiện ghi chú mới.
+              ref.read(noteRepositoryProvider).save(card.id, noteController.text);
             },
-            child: Text('Lưu', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
+            child: Text('Lưu', style: TextStyle(color: Theme.of(dialogContext).cardColor, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -101,7 +161,17 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Flashcard currentCard = MockData.flashcards[currentIndex];
+    final cards = ref.watch(cardsProvider(widget.topicId));
+    final quiz = ref.watch(topicQuizProvider(widget.topicId)).value;
+    final list = cards.value;
+    if (list != null) {
+      _cards = {for (final c in list) c.id: c};
+      _order ??= list.map((c) => c.id).toList();
+      // Thẻ bị xoá (admin gỡ khi đang học) thì bỏ khỏi thứ tự.
+      _order!.removeWhere((id) => !_cards.containsKey(id));
+      if (currentIndex >= _count && _count > 0) currentIndex = _count - 1;
+    }
+    final Flashcard? currentCard = _current;
 
     return Scaffold(
       appBar: AppBar(
@@ -119,8 +189,25 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           ),
         ),
         centerTitle: false,
+        actions: [
+          if (quiz != null && quiz.questionCount > 0)
+            IconButton(
+              tooltip: 'Kiểm tra',
+              icon: const Icon(Icons.quiz_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => QuizScreen(quizId: quiz.id, title: quiz.title)),
+              ),
+            ),
+        ],
       ),
-      body: SafeArea(
+      body: currentCard == null
+          ? Center(
+              child: cards.isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('Chủ đề này chưa có từ vựng.', style: TextStyle(color: AppTheme.greyColor)),
+            )
+          : SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
@@ -136,7 +223,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                     const SizedBox(width: 10),
                     Expanded(child: _buildAnimatedFlashcard(currentCard)),
                     const SizedBox(width: 10),
-                    _buildNavButton(Icons.chevron_right, _nextCard, currentIndex < MockData.flashcards.length - 1),
+                    _buildNavButton(Icons.chevron_right, _nextCard, currentIndex < _count - 1),
                   ],
                 ),
               ),
@@ -162,7 +249,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '${currentIndex + 1}/${MockData.flashcards.length}',
+              '${currentIndex + 1}/$_count',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             Text(
@@ -173,7 +260,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         ),
         const SizedBox(height: 8),
         LinearProgressIndicator(
-          value: (currentIndex + 1) / MockData.flashcards.length,
+          value: (currentIndex + 1) / _count,
           backgroundColor: Colors.grey.shade300,
           color: AppTheme.primaryColor,
           minHeight: 6,
@@ -222,7 +309,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.05),
+            color: Colors.blue.withValues(alpha: 0.05),
             blurRadius: 20,
             spreadRadius: 5,
             offset: const Offset(0, 10),
@@ -245,7 +332,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             child: GestureDetector(
               onTap: () {
                 // Hiển thị Bottom Sheet chi tiết từ vựng
-                VocabularyBottomSheet.show(context, card);
+                VocabularyBottomSheet.show(
+                  context,
+                  card,
+                  onToggleBookmark: () => ref.read(bookmarkRepositoryProvider).toggle(card.id),
+                );
               },
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -340,12 +431,12 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                 Text('Ví dụ:', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 8),
                 Text(
-                  card.example,
+                  card.example ?? '',
                   style: TextStyle(fontSize: 16,  fontWeight: FontWeight.w500, height: 1.4),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  card.exampleTranslation,
+                  card.exampleTranslation ?? '',
                   style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.4),
                 ),
               ],
@@ -364,7 +455,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         decoration: BoxDecoration(
           color: isActive ? Colors.white : Colors.transparent,
           shape: BoxShape.circle,
-          boxShadow: isActive ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
+          boxShadow: isActive ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5)] : null,
         ),
         child: Icon(icon, color: isActive ? AppTheme.primaryColor : Colors.grey.shade400),
       ),
@@ -375,8 +466,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(
-        MockData.flashcards.length,
-            (index) => Container(
+        // Nhiều thẻ thì chỉ vẽ tối đa 12 chấm quanh thẻ hiện tại.
+        min(_count, 12),
+            (i) {
+          final index = i + (_count <= 12 ? 0 : (currentIndex - 6).clamp(0, _count - 12));
+          return Container(
           margin: const EdgeInsets.symmetric(horizontal: 4),
           width: currentIndex == index ? 8 : 6,
           height: currentIndex == index ? 8 : 6,
@@ -384,7 +478,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             color: currentIndex == index ? AppTheme.primaryColor : Colors.blue.shade100,
             shape: BoxShape.circle,
           ),
-        ),
+        );
+        },
       ),
     );
   }
@@ -399,7 +494,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             icon: Icons.refresh,
             color: const Color(0xFFFF4D4F),
             bgColor: const Color(0xFFFFF1F0),
-            onTap: _nextCard,
+            onTap: () => _rate('AGAIN'),
           ),
         ),
         const SizedBox(width: 15),
@@ -410,7 +505,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
             icon: Icons.check,
             color: const Color(0xFF52C41A),
             bgColor: const Color(0xFFF6FFED),
-            onTap: _nextCard,
+            onTap: () => _rate('KNOW'),
           ),
         ),
       ],
@@ -432,7 +527,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -447,7 +542,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(subtitle, style: TextStyle(color: color.withOpacity(0.8), fontSize: 12)),
+                Text(subtitle, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 12)),
               ],
             )
           ],
@@ -459,7 +554,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   // Thêm tham số Flashcard card vào hàm
   Widget _buildNoteSection(Flashcard card) {
     // Kiểm tra xem thẻ này đã có ghi chú chưa
-    bool hasNote = card.note != null && card.note!.isNotEmpty;
+    final hasNote = card.hasNote;
 
     return GestureDetector(
       onTap: () => _showNoteDialog(card), // Mở hộp thoại khi bấm vào
@@ -468,7 +563,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         decoration: BoxDecoration(
           color: hasNote ? Colors.white : const Color(0xFFEEF2FF),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: hasNote ? AppTheme.primaryColor.withOpacity(0.3) : Colors.transparent),
+          border: Border.all(color: hasNote ? AppTheme.primaryColor.withValues(alpha: 0.3) : Colors.transparent),
           boxShadow: hasNote ? [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))] : null,
         ),
         child: Row(

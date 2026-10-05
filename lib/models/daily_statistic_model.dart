@@ -1,22 +1,24 @@
 class DailyStatistic {
-  final String id;
-  final String userId;
+  /// Ngày theo giờ địa phương (00:00).
   final DateTime date;
   final int wordsLearned;
+  final int cardsReviewed;
   final int xpGained;
+  final int lessonsCompleted;
+  final int quizzesCompleted;
+  final int correctAnswers;
+  final int totalAnswers;
+  final int studySeconds;
 
-  DailyStatistic({
-    required this.id, required this.userId, required this.date,
-    required this.wordsLearned, required this.xpGained
+  const DailyStatistic({
+    required this.date,
+    this.wordsLearned = 0,
+    this.cardsReviewed = 0,
+    this.xpGained = 0,
+    this.lessonsCompleted = 0,
+    this.quizzesCompleted = 0,
+    this.correctAnswers = 0,
+    this.totalAnswers = 0,
+    this.studySeconds = 0,
   });
-
-  factory DailyStatistic.fromJson(Map<String, dynamic> json) {
-    return DailyStatistic(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      date: DateTime.parse(json['date']),
-      wordsLearned: json['wordsLearned'] ?? 0,
-      xpGained: json['xpGained'] ?? 0,
-    );
-  }
 }

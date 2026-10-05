@@ -1,44 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
 import '../../models/reward_item_model.dart';
+import '../../models/user_model.dart';
+import '../../providers/providers.dart';
+import '../../providers/user_providers.dart';
 import 'settings_screen.dart';
 import 'shop_screen.dart';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+/// Kho đồ của user (chỉ món đã sở hữu), đọc từ SQLite.
+final _inventoryProvider = StreamProvider.autoDispose<List<RewardItem>>(
+  (ref) => ref.watch(dbProvider).shopDao.watchInventoryWithItems(),
+);
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-
-  List<Color> get equippedBorderColors {
-    try {
-      final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'border');
-      final item = MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-      return item.borderColors.map((hex) => Color(hex)).toList();
-    } catch (e) {
-      return [const Color(0xFFE2E8F0), const Color(0xFFCBD5E1)]; // Trắng xám mặc định
-    }
-  }
-
-  RewardItem? get equippedAvatar {
-    try {
-      final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'avatar');
-      return MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-    } catch (e) { return null; }
-  }
-
-  void _showEditNoteDialog() {
-    TextEditingController noteController = TextEditingController(text: MockData.currentUser.slogan);
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  void _showEditNoteDialog(UserModel user) {
+    final noteController = TextEditingController(text: user.slogan);
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Cập nhật Slogan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('Cập nhật Slogan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: noteController,
           maxLength: 30,
@@ -50,17 +41,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
             onPressed: () {
-              setState(() {
-                // Cập nhật Slogan thẳng vào UserModel
-                MockData.currentUser.slogan = noteController.text.trim();
-              });
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+              // Ghi user_profile (is_dirty) + PROFILE_UPDATE {slogan, baseVersion, clientUpdatedAt}.
+              ref.read(profileRepositoryProvider).updateSlogan(noteController.text.trim());
             },
-            child: Text('Lưu', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
+            child: Text('Lưu', style: TextStyle(color: Theme.of(dialogContext).cardColor, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -69,8 +58,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Gọi user hiện tại
-    final user = MockData.currentUser;
+    final user = ref.watch(profileProvider).value;
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final equippedBorderColors = user.equippedBorderColors.isEmpty
+        ? const [Color(0xFFE2E8F0), Color(0xFFCBD5E1)]
+        : (user.equippedBorderColors.length == 1
+            ? [Color(user.equippedBorderColors.first), Color(user.equippedBorderColors.first)]
+            : user.equippedBorderColors.map((c) => Color(c)).toList());
+    final avatarUrl = user.equippedAvatarUrl ?? user.avatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    final rank = ref.watch(leaderboardProvider('XP')).value?.me?.rank;
 
     return Scaffold(
       appBar: AppBar(
@@ -95,7 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                  boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
                 ),
                 child: Column(
                   children: [
@@ -110,12 +109,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             radius: 35,
                             backgroundColor: const Color(0xFFEEF2FF),
-                            backgroundImage: (equippedAvatar != null && equippedAvatar!.imageUrl != null && equippedAvatar!.imageUrl!.isNotEmpty)
-                                ? NetworkImage(equippedAvatar!.imageUrl!) as ImageProvider
-                                : null,
-                            child: (equippedAvatar == null || equippedAvatar!.imageUrl == null || equippedAvatar!.imageUrl!.isEmpty)
-                                ? Icon(Icons.person, size: 40, color: AppTheme.primaryColor)
-                                : null,
+                            backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                            child: hasAvatar ? null : const Icon(Icons.person, size: 40, color: AppTheme.primaryColor),
                           ),
                         ),
                         const SizedBox(width: 20),
@@ -129,12 +124,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Expanded(
                                     child: Text(user.fullName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, ), maxLines: 1, overflow: TextOverflow.ellipsis),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
-                                    child: Text('Top 1 Point', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
+                                  if (rank != null) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
+                                      child: Text(rank <= 10 ? 'Top $rank Point' : 'Hạng #$rank', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 5),
@@ -142,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Text(user.email, style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
                               const SizedBox(height: 5),
                               GestureDetector(
-                                onTap: _showEditNoteDialog,
+                                onTap: () => _showEditNoteDialog(user),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -162,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Icon(Icons.stars, color: Colors.amber, size: 16),
                                   const SizedBox(width: 4),
                                   // Lấy XP hiện tại để mua sắm
-                                  Text('${user.currentXp} XP', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  Text('${user.displayXp} XP', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
                                 ],
                               ),
                             ],
@@ -181,11 +178,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         icon: Icon(Icons.storefront),
                         label: Text('Cửa hàng đổi thưởng', style: TextStyle(fontWeight: FontWeight.bold)),
-                        onPressed: () async {
-                          // Điều hướng sang Shop, đợi quay về rồi reload UI để cập nhật XP/Viền mới
-                          await Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen()));
-                          setState(() {});
-                        },
+                        // Profile watch SQLite nên tự cập nhật XP / viền mới khi quay về.
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen())),
                       ),
                     )
                   ],
@@ -197,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                  boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
                 ),
                 child: Column(
                   children: [
@@ -207,12 +201,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildStatTile(Icons.menu_book, Colors.green, 'Tổng số từ đã học', '${user.totalWordsLearned}'),
                     const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
                     _buildStatTile(Icons.task_alt, Colors.blue, 'Số bài hoàn thành', '${user.completedLessons}'),
+                    const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
+                    _buildStatTile(Icons.emoji_events_outlined, Colors.amber, 'Tổng XP tích luỹ', '${user.totalLifetimeXp}'),
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+              _buildInventory(),
+              SizedBox(height: 20 + MediaQuery.of(context).padding.bottom),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Kho đồ: chạm để trang bị (ITEM_EQUIP), giống Shop.
+  Widget _buildInventory() {
+    final items = ref.watch(_inventoryProvider).value ?? const <RewardItem>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Kho đồ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (context, i) {
+                final item = items[i];
+                final colors = item.borderColors.map((c) => Color(c)).toList();
+                final grad = colors.isEmpty
+                    ? const [Color(0xFFE2E8F0), Color(0xFFCBD5E1)]
+                    : (colors.length == 1 ? [colors.first, colors.first] : colors);
+                final img = item.isAvatar && (item.imageUrl ?? '').isNotEmpty;
+                return GestureDetector(
+                  onTap: item.isEquipped ? null : () => ref.read(shopRepositoryProvider).setEquipped(item, true),
+                  child: Column(children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: grad)),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: const Color(0xFFEEF2FF),
+                        backgroundImage: img ? NetworkImage(item.imageUrl!) : null,
+                        child: img ? null : Icon(item.isBorder ? Icons.lens_outlined : Icons.person, color: AppTheme.primaryColor),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(item.isEquipped ? 'Đang dùng' : item.name,
+                        style: TextStyle(fontSize: 11, color: item.isEquipped ? Colors.green : AppTheme.greyColor, fontWeight: FontWeight.bold)),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
