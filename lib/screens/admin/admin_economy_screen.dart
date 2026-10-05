@@ -97,9 +97,13 @@ class _AdminEconomyScreenState extends ConsumerState<AdminEconomyScreen> {
         },
         child: items.isEmpty
             ? ListView(children: [SizedBox(height: 260, child: EmptyView(message: tr('Không có dữ liệu'), icon: Icons.inbox_outlined))])
-            : ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 90), children: items),
+            : ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 140), children: items), // Tăng padding bottom lên 140
       ),
-      floatingActionButton: FloatingActionButton(backgroundColor: fab, onPressed: onAdd, child: const Icon(Icons.add, color: Colors.white)),
+      // Đẩy FAB lên cao 95px để lơ lửng đẹp hơn
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 95),
+        child: FloatingActionButton(backgroundColor: fab, onPressed: onAdd, child: const Icon(Icons.add, color: Colors.white)),
+      ),
     );
   }
 

@@ -20,7 +20,6 @@ class AdminUsersScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
-  /// 'USER' (học viên) | 'ADMIN' (quản trị viên): server lọc theo `role`.
   String _role = 'USER';
   String _keyword = '';
   Timer? _debounce;
@@ -93,7 +92,6 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     if (saved == true) _load();
   }
 
-  /// Không tự khoá chính mình: server trả 422.
   Future<void> _toggleLock(UserModel user) async {
     final lock = user.status != 'LOCKED';
     final ok = await adminRun(
@@ -150,10 +148,14 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
           Expanded(child: _body()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppTheme.primaryColor,
-        onPressed: () => _openForm(),
-        child: const Icon(Icons.person_add, color: Colors.white),
+      // Đẩy FAB lên cao 95px để lơ lửng hơn hẳn
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 95),
+        child: FloatingActionButton(
+          backgroundColor: AppTheme.primaryColor,
+          onPressed: () => _openForm(),
+          child: const Icon(Icons.person_add, color: Colors.white),
+        ),
       ),
     );
   }
@@ -181,7 +183,8 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
+        // Padding bottom 140 để nội dung cuối không bị FAB đè lên
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
         itemCount: _users.length + (_page + 1 < _totalPages ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _users.length) {
@@ -273,7 +276,6 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       );
 }
 
-// ================= FORM TẠO / SỬA TÀI KHOẢN =================
 class UserFormScreen extends ConsumerStatefulWidget {
   final UserModel? existingUser;
 
@@ -322,8 +324,6 @@ class _UserFormScreenState extends ConsumerState<UserFormScreen> {
     final ok = await adminRun(context, () async {
       if (_isEdit) {
         final user = widget.existingUser!;
-        // Tài khoản đang chờ xác thực email: giữ nguyên trạng thái nếu admin không chọn khoá.
-        // Không tự khoá / hạ quyền chính mình: server trả 422.
         await api.updateUser(user.id, {
           'fullName': _name.text.trim(),
           'level': _level,

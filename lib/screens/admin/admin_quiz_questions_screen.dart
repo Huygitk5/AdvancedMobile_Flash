@@ -154,7 +154,7 @@ class AdminQuizQuestionsScreen extends ConsumerStatefulWidget {
   /// Quiz chưa tạo: "Lưu" sẽ gọi create.
   final Quiz? draft;
 
-  const AdminQuizQuestionsScreen({super.key, required String this.quizId, required this.quizTitle}) : draft = null;
+  const AdminQuizQuestionsScreen({super.key, required String this.quizId, required String this.quizTitle}) : draft = null;
 
   AdminQuizQuestionsScreen.create({super.key, required Quiz this.draft})
       : quizId = null,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../core/config.dart';
 import '../../core/env.dart';
 import '../../core/l10n.dart';
 import '../../data/remote/dto/auth_dto.dart';
@@ -44,6 +45,7 @@ Future<String> googleIdToken() async {
     }
     return idToken;
   } on GoogleSignInException catch (e) {
+    debugPrint('[GoogleSignIn] code=${e.code} description=${e.description} details=${e.details}');
     if (e.code == GoogleSignInExceptionCode.canceled) throw const GoogleSignInCancelled();
     throw GoogleSignInUnavailable(tr('Đăng nhập Google thất bại. Hãy kiểm tra cấu hình OAuth (SHA-1, client id).'));
   } on UnsupportedError {
@@ -84,6 +86,7 @@ Future<void> signInWithGoogle(BuildContext context, WidgetRef ref, void Function
   } on GoogleSignInUnavailable catch (e) {
     if (context.mounted) showAppSnack(context, e.message, error: true);
   } catch (e) {
+    debugPrint('[GoogleSignIn] backend/other error: $e (baseUrl=${AppConfig.apiBaseUrl})');
     if (context.mounted) showAppSnack(context, errorMessage(e), error: true);
   }
   if (context.mounted) setBusy(false);
