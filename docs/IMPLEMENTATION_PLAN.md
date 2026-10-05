@@ -240,18 +240,18 @@ Làm theo thứ tự, vì các service sau gọi service trước.
 
 ### G6.1 Package
 
-- [ ] ```bash
+- [x] ```bash
   flutter pub add drift drift_flutter sqlite3_flutter_libs path_provider path \
     flutter_secure_storage shared_preferences dio connectivity_plus \
     workmanager uuid flutter_riverpod google_sign_in json_annotation intl
   flutter pub add -d drift_dev build_runner json_serializable mocktail
   ```
   Quản lý state: **Riverpod** (hợp với `Stream` của Drift). Không cần code-gen cho Riverpod: dùng `Provider`, `StreamProvider`, `FutureProvider`, `NotifierProvider` viết tay.
-- [ ] Android: `minSdkVersion 23` (flutter_secure_storage), quyền `INTERNET` trong `AndroidManifest.xml` (bản release), `android:usesCleartextTraffic="true"` **chỉ ở debug** để gọi `http://`.
+- [x] Android: `minSdkVersion 23` (flutter_secure_storage), quyền `INTERNET` trong `AndroidManifest.xml` (bản release), `android:usesCleartextTraffic="true"` **chỉ ở debug** để gọi `http://`.
 
 ### G6.2 Cấu trúc thư mục
 
-- [ ] Giữ `screens/`, `widgets/`, `models/`, `core/theme.dart`; thêm:
+- [x] Giữ `screens/`, `widgets/`, `models/`, `core/theme.dart`; thêm:
   ```
   lib/
   ├── main.dart                bootstrap(): ensureInitialized → AppPrefs.load → AppDatabase → ProviderScope
@@ -266,17 +266,17 @@ Làm theo thứ tự, vì các service sau gọi service trước.
   │   ├── local/               app_database.dart, schema.drift, converters.dart, daos/*.dart
   │   ├── remote/              api_client.dart, auth_interceptor.dart, api_exception.dart, apis/*.dart, dto/*.dart
   │   ├── storage/             secure_store.dart, app_prefs.dart
-  │   ├── sync/                sync_queue_service.dart, sync_worker.dart, pull_service.dart, op_handlers.dart, xp_estimator.dart, srs.dart
-  │   └── repositories/        auth, content, srs, note, bookmark, lesson, quiz, quest, shop, profile, stats, leaderboard, settings, admin
-  ├── providers/               providers.dart (db, api, repos), auth_providers.dart, *_providers.dart theo màn hình
-  ├── models/  screens/  widgets/   (giữ)
-  └── data/mock_data.dart      (xoá ở cuối G8)
+  │   ├── sync/                sync_worker.dart, pull_service.dart, op_handlers.dart, xp_estimator.dart, srs.dart, background_sync.dart
+  │   └── repositories/        base_repository.dart, study_repositories.dart, user_repositories.dart
+  ├── providers/               providers.dart (db, api, sync, repos), auth_providers.dart, content_providers.dart, user_providers.dart
+  ├── models/  screens/  widgets/   (giữ; thêm widgets/sync_scope.dart, widgets/app_snack.dart)
+  └── data/mock_data.dart      (đã xoá ở G8 Đợt 5)
   ```
 
 ### G6.3 Local DB (Drift)
 
-- [ ] Copy `docs/sql/client_sqlite.sql` → `lib/data/local/schema.drift`, **bỏ dòng `PRAGMA`**. DDL đã có `is_active` cho `reward_items` và `quest_definitions` (`/v1/sync/content` gửi cả vật phẩm / nhiệm vụ đã tắt; Shop lọc `is_active = 1`, kho đồ và nhiệm vụ cũ vẫn hiện).
-- [ ] ```dart
+- [x] Copy `docs/sql/client_sqlite.sql` → `lib/data/local/schema.drift`, **bỏ dòng `PRAGMA`**. DDL đã có `is_active` cho `reward_items` và `quest_definitions` (`/v1/sync/content` gửi cả vật phẩm / nhiệm vụ đã tắt; Shop lọc `is_active = 1`, kho đồ và nhiệm vụ cũ vẫn hiện).
+- [x] ```dart
   @DriftDatabase(include: {'schema.drift'})
   class AppDatabase extends _$AppDatabase {
     AppDatabase([QueryExecutor? e]) : super(e ?? driftDatabase(name: 'flash.db'));
@@ -289,8 +289,8 @@ Làm theo thứ tự, vì các service sau gọi service trước.
   }
   ```
   `dart run build_runner build --delete-conflicting-outputs`.
-- [ ] Converter: thời gian ở SQLite là **epoch ms UTC** (`INTEGER`), API là ISO-8601 → hàm `int? toEpoch(String?)`, `String? toIso(int?)` trong `converters.dart`. Boolean là `0/1`.
-- [ ] DAO tối thiểu cho G7/G8 (mỗi DAO một file, đọc bằng `.watch()`):
+- [x] Converter: thời gian ở SQLite là **epoch ms UTC** (`INTEGER`), API là ISO-8601 → hàm `int? toEpoch(String?)`, `String? toIso(int?)` trong `converters.dart`. Boolean là `0/1`.
+- [x] DAO tối thiểu cho G7/G8 (mỗi DAO một file, đọc bằng `.watch()`):
 
   | DAO | Bảng | Hàm chính |
   |---|---|---|
@@ -304,21 +304,21 @@ Làm theo thứ tự, vì các service sau gọi service trước.
 
 ### G6.4 Key-value storage
 
-- [ ] `SecureStore` với các key §4.2, **thêm `user_role`** (`USER` / `ADMIN`) vì `user_profile` không có cột role mà màn đầu tiên cần biết vào `MainScreen` hay `AdminMainScreen`. Android `encryptedSharedPreferences: true`; iOS `first_unlock`. `device_id` sinh 1 lần.
-- [ ] `AppPrefs` với các key §4.3. Đọc trong `main()` **trước** `runApp`, đặt `themeNotifier.value` theo `is_dark_mode` để không bị nháy.
+- [x] `SecureStore` với các key §4.2, **thêm `user_role`** (`USER` / `ADMIN`) vì `user_profile` không có cột role mà màn đầu tiên cần biết vào `MainScreen` hay `AdminMainScreen`. Android `encryptedSharedPreferences: true`; iOS `first_unlock`. `device_id` sinh 1 lần.
+- [x] `AppPrefs` với các key §4.3. Đọc trong `main()` **trước** `runApp`, đặt `themeNotifier.value` theo `is_dark_mode` để không bị nháy.
 
 ### G6.5 API client (Dio)
 
-- [ ] `ApiClient`: `baseUrl = env.apiBaseUrl`, timeout 10 giây, header `Accept-Language` theo `app_language`.
-- [ ] Bóc envelope `{success, code, message, data, errors, timestamp}` ở **một chỗ**: thành công trả `data`. Lỗi ném `ApiException(status, code, message, errors, data)`; lỗi mạng ném `NetworkException`. Riêng 409 `VERSION_CONFLICT` có `data` là bản server.
-- [ ] Danh sách phân trang có dạng `{items, page, size, totalElements, totalPages}` → `PageDto<T>`.
-- [ ] `AuthInterceptor` (`QueuedInterceptor` để nhiều request không refresh cùng lúc):
+- [x] `ApiClient`: `baseUrl = env.apiBaseUrl`, timeout 10 giây, header `Accept-Language` theo `app_language`.
+- [x] Bóc envelope `{success, code, message, data, errors, timestamp}` ở **một chỗ**: thành công trả `data`. Lỗi ném `ApiException(status, code, message, errors, data)`; lỗi mạng ném `NetworkException`. Riêng 409 `VERSION_CONFLICT` có `data` là bản server.
+- [x] Danh sách phân trang có dạng `{items, page, size, totalElements, totalPages}` → `PageDto<T>`.
+- [x] `AuthInterceptor` (`QueuedInterceptor` để nhiều request không refresh cùng lúc):
   - Gắn `Authorization: Bearer <access_token>`, trừ `/v1/auth/**`.
   - Chủ động refresh khi `access_token_expires_at - now < 60s`. Khi gặp 401 thì refresh **một lần** rồi gọi lại.
   - Refresh: `POST /v1/auth/refresh-token {refreshToken}` → lưu cặp token mới (refresh token bị rotate). Thất bại → `authController.forceLogout()`.
-- [ ] Mã lỗi map sang câu tiếng Việt cho UI (`api_exception.dart`): `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED` (423), `EMAIL_ALREADY_EXISTS`, `INVALID_OTP`, `WRONG_PASSWORD`, `INSUFFICIENT_XP`, `ALREADY_OWNED`, `RANK_REQUIREMENT_NOT_MET`, `QUEST_NOT_COMPLETED`, `VERSION_CONFLICT`, `TOO_MANY_REQUESTS`, `VALIDATION_ERROR` (hiện `errors[].message`).
-- [ ] 429: không retry ngay. `/v1/auth/**` 20 request/phút theo IP; `/v1/sync/**` 30 request/phút theo user (tính chung push/pull/content).
-- [ ] `apis/*.dart` mỏng, mỗi hàm một endpoint, trả DTO. DTO dùng `json_serializable`, tên field trùng JSON (camelCase), enum giữ nguyên chuỗi server (`BORDER`, `KNOW`, `IN_PROGRESS`…).
+- [x] Mã lỗi map sang câu tiếng Việt cho UI (`api_exception.dart`): `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED` (423), `EMAIL_ALREADY_EXISTS`, `INVALID_OTP`, `WRONG_PASSWORD`, `INSUFFICIENT_XP`, `ALREADY_OWNED`, `RANK_REQUIREMENT_NOT_MET`, `QUEST_NOT_COMPLETED`, `VERSION_CONFLICT`, `TOO_MANY_REQUESTS`, `VALIDATION_ERROR` (hiện `errors[].message`).
+- [x] 429: không retry ngay. `/v1/auth/**` 20 request/phút theo IP; `/v1/sync/**` 30 request/phút theo user (tính chung push/pull/content).
+- [x] `apis/*.dart` mỏng, mỗi hàm một endpoint, trả DTO. DTO dùng `json_serializable`, tên field trùng JSON (camelCase), enum giữ nguyên chuỗi server (`BORDER`, `KNOW`, `IN_PROGRESS`…).
 
 ### G6.6 Chỉnh model (`lib/models/`)
 
@@ -342,7 +342,7 @@ Model là thứ UI dùng; dựng từ **dòng Drift** (qua extension `toModel()`
 
 ### G6.7 Khởi động app
 
-- [ ] `main()`:
+- [x] `main()`:
   ```dart
   Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -353,8 +353,8 @@ Model là thứ UI dùng; dựng từ **dòng Drift** (qua extension `toModel()`
                          child: const FlashApp()));
   }
   ```
-- [ ] `StartGate` (thay `home: const WelcomeScreen()`): chưa có `refresh_token` → `WelcomeScreen` (hoặc `LoginScreen` nếu `onboarding_completed`); có token → `user_role == 'ADMIN'` ? `AdminMainScreen` : `MainScreen`, đồng thời kick sync nền. Mở app offline vẫn vào thẳng được vì dữ liệu nằm trong SQLite.
-- [ ] `authStateProvider` (`NotifierProvider`): `signedOut` / `signedIn(userId, role)`. Mọi nút "Đăng xuất" và `forceLogout()` đều đi qua đây để xoá dữ liệu đúng một chỗ.
+- [x] `StartGate` (thay `home: const WelcomeScreen()`): chưa có `refresh_token` → `WelcomeScreen` (hoặc `LoginScreen` nếu `onboarding_completed`); có token → `user_role == 'ADMIN'` ? `AdminMainScreen` : `MainScreen`, đồng thời kick sync nền. Mở app offline vẫn vào thẳng được vì dữ liệu nằm trong SQLite.
+- [x] `authStateProvider` (`NotifierProvider`): `signedOut` / `signedIn(userId, role)`. Mọi nút "Đăng xuất" và `forceLogout()` đều đi qua đây để xoá dữ liệu đúng một chỗ.
 
 ### G6.8 Đổi tham số điều hướng (làm cùng màn hình ở G8, nhưng chốt từ G6)
 
@@ -367,7 +367,16 @@ Model là thứ UI dùng; dựng từ **dòng Drift** (qua extension `toModel()`
 | `CompletionScreen` | — | `lessonCompletionId`, `xpEstimate` | FlashcardScreen, GrammarDetailScreen |
 | `AdminFlashcardsScreen` / `AdminGrammarExamplesScreen` / `AdminQuizQuestionsScreen` | id + title (id mock) | giữ, id là UUID server | AdminContentScreen |
 
-**DoD G6:** `flutter build apk --debug` được. Test Drift in-memory (`NativeDatabase.memory()`) tạo đủ **25 bảng** và `clearUserData()` chỉ xoá nhóm B, C. Đọc/ghi SecureStore + AppPrefs được. Test `ApiClient` với `DioAdapter`/`mocktail`: bóc envelope đúng, `ApiException` đúng `code`, 2 request cùng gặp 401 chỉ refresh 1 lần.
+**DoD G6:** `flutter build apk --debug` được. Test Drift in-memory (`NativeDatabase.memory()`) tạo đủ **25 bảng** và `clearUserData()` chỉ xoá nhóm B, C. Đọc/ghi SecureStore + AppPrefs được. Test `ApiClient` với `DioAdapter`/`mocktail`: bóc envelope đúng, `ApiException` đúng `code`, 2 request cùng gặp 401 chỉ refresh 1 lần. ✅ *Đạt: `flutter build apk --debug` thành công; `flutter analyze` sạch. Test: `app_database_test` (25 bảng, `clearUserData` chỉ xoá nhóm B, C, FK cascade), `storage_test`, `api_client_test` (bóc envelope, `ApiException` đúng `code`, 2 request cùng 401 chỉ refresh 1 lần).*
+
+*Ghi chú khi làm:*
+- **Lỗi Drift đã sửa:** dòng chú thích ở đầu `schema.drift` kết thúc bằng dấu `:` (`-- Conventions:`) khiến Drift đọc nhầm thành tên query và **bỏ mất `CREATE TABLE topics`** (chỉ còn 24 bảng, mọi test DB fail). Đã đổi dòng đó; đừng kết thúc dòng chú thích bằng `:` trong file `.drift`.
+- **DAO viết SQL thuần** (`customSelect` + `readsFrom`, `customInsert/Update` + `updates`) giống `SyncDao`, vì Drift sinh lớp `Topic`, `Flashcard`, `RewardItem`... trùng tên model. Khung chung ở `daos/base_dao.dart`. Ghi luôn dùng `INSERT ... ON CONFLICT DO UPDATE` (helper `upsert`), **không** dùng `INSERT OR REPLACE`: REPLACE xoá dòng cũ và kéo theo ON DELETE CASCADE (thay 1 topic sẽ xoá sạch thẻ + tiến độ).
+- DAO thực tế: `ContentDao`, `SrsDao`, `ProgressDao` (tiến độ topic / ngữ pháp, tính lạc quan theo đúng `ContentProgressService`), `NoteDao`, `BookmarkDao`, `LessonDao`, `QuizDao`, `QuestDao`, `ShopDao`, `ProfileDao`, `StatsDao`, `LeaderboardDao`, `SyncDao`; tất cả là getter trên `AppDatabase` (`db.contentDao`...).
+- **DTO viết tay** (không dùng `json_serializable`) cho khớp `auth_dto.dart` đã có; model có `fromJson` an toàn với field bị bỏ (`default-property-inclusion: non_null`) qua `models/_json.dart`. Sync dùng `Map` JSON trực tiếp (payload là body REST).
+- `AppDatabase` mở bằng `DriftNativeOptions(shareAcrossIsolates: true)` để isolate nền của workmanager dùng chung file DB.
+- Android: `minSdk = maxOf(flutter.minSdkVersion, 23)` (Flutter hiện mặc định 24), quyền `INTERNET` + `ACCESS_NETWORK_STATE` ở manifest chính, `usesCleartextTraffic` chỉ ở `src/debug`.
+- `Env.googleServerClientId` (`--dart-define=GOOGLE_SERVER_CLIENT_ID=...`, OAuth client **Web**) để Android lấy được `idToken`; rỗng thì nút Google báo chưa cấu hình.
 
 ---
 
@@ -375,11 +384,11 @@ Model là thứ UI dùng; dựng từ **dòng Drift** (qua extension `toModel()`
 
 ### G7.1 Hàng đợi
 
-- [ ] `SyncQueueService.enqueue(opType, entityTable, entityId, payload)`:
+- [x] `SyncQueueService.enqueue(opType, entityTable, entityId, payload)`:
   - Luôn gọi **bên trong** `db.transaction` của thao tác ghi (cùng transaction với ghi lạc quan ở G7.3).
   - `op_id = newId()`, `created_at = now`, `payload` là JSON đúng body REST tương ứng (Swagger, schema `SyncOperation`).
   - Coalescing cho `NOTE_UPSERT`, `BOOKMARK_SET`, `PROFILE_UPDATE`, `ITEM_EQUIP`, `SETTINGS_UPDATE`: đã có op `pending` cùng `entity_id` → thay payload (giữ `op_id` cũ). Không gộp `FLASHCARD_REVIEW`, `QUIZ_SUBMIT`, `LESSON_COMPLETE`.
-- [ ] `SyncWorker.flush()`:
+- [x] `SyncWorker.flush()`:
   1. Lúc khởi động: đưa op `in_flight` còn sót về `pending`.
   2. Lấy ≤ 50 op `pending` có `next_retry_at ≤ now` theo `id`, đánh dấu `in_flight`.
   3. `POST /v1/sync/push {deviceId, clientSentAt, operations: [{opId, opType, createdAt, payload}]}`. `clientSentAt` lấy **ngay trước khi gửi** (server dựa vào nó để tính lệch đồng hồ).
@@ -392,16 +401,16 @@ Model là thứ UI dùng; dựng từ **dòng Drift** (qua extension `toModel()`
   6. Ghi `user` snapshot trong response vào `user_profile` (các cột XP / streak / tổng số). Khi hàng đợi rỗng thì đặt `pending_xp = 0`.
   7. Còn op `pending` → lặp lại (tối đa vài lô mỗi lần flush để không chạm 30 request/phút).
   8. Một mutex để chỉ một `flush()` chạy cùng lúc.
-- [ ] `SyncWorker.kick()`: debounce khoảng 2 giây rồi `flush()` → `PullService.pullUserData()`.
+- [x] `SyncWorker.kick()`: debounce khoảng 2 giây rồi `flush()` → `PullService.pullUserData()`.
 
 ### G7.2 Pull
 
-- [ ] `PullService.pullContent()` rồi `pullUserData()`: `GET /v1/sync/content|pull?since=<cursor>&limit=500` (lần đầu bỏ `since`) → `{cursor, hasMore, changes}`. Mỗi trang upsert trong 1 transaction cùng lưu `cursor` vào `sync_meta` (scope `content` / `user_data`), lặp khi `hasMore`.
+- [x] `PullService.pullContent()` rồi `pullUserData()`: `GET /v1/sync/content|pull?since=<cursor>&limit=500` (lần đầu bỏ `since`) → `{cursor, hasMore, changes}`. Mỗi trang upsert trong 1 transaction cùng lưu `cursor` vào `sync_meta` (scope `content` / `user_data`), lặp khi `hasMore`.
   - **Content:** `changes.{topics, flashcards, grammarLessons, grammarExamples, quizzes, quizQuestions, questDefinitions, rewardItems}`; `updatedAt` → `server_updated_at`; `quizQuestions[].options[4]` → 4 dòng `quiz_question_options` (xoá cũ, chèn mới). `changes.deleted.{topics, flashcards, grammarLessons, grammarExamples, quizzes, quizQuestions}` là id cần **xoá** khỏi cache (FK cascade dọn bảng con).
   - **User data:** `changes.{userFlashcardProgress, userFlashcardNotes, userBookmarks, userTopicProgress, userGrammarProgress, userQuests, userInventories, dailyStatistics}`. **Bỏ qua dòng local có `is_dirty = 1`**. Ghi chú / bookmark có `deletedAt` thì giữ tombstone (UI lọc `deleted_at IS NULL`). `changes.user` luôn có → ghi đè `user_profile` (giữ nguyên slogan / tên / level nếu profile đang dirty); `changes.settings` có thì ghi vào `AppPrefs`.
   - `daily_statistics` của **hôm nay** đang có số lạc quan: chỉ ghi đè khi không còn op `pending` nào làm thay đổi nó (hoặc cộng lại phần pending).
-- [ ] Không pull được: lịch sử quiz của thiết bị khác (`quiz_attempts` không có `updated_at`) → màn lịch sử gọi `GET /v1/quizzes/attempts` khi online.
-- [ ] Trigger: mở app, `AppLifecycleState.resumed`, `connectivity_plus` báo có mạng, sau push thành công, `workmanager` định kỳ 15 phút (constraint: có mạng). Tất cả đi qua `kick()` (debounce).
+- [ ] Không pull được: lịch sử quiz của thiết bị khác (`quiz_attempts` không có `updated_at`) → màn lịch sử gọi `GET /v1/quizzes/attempts` khi online. *(Chưa làm: app chưa có màn lịch sử quiz.)*
+- [x] Trigger: mở app, `AppLifecycleState.resumed`, `connectivity_plus` báo có mạng, sau push thành công, `workmanager` định kỳ 15 phút (constraint: có mạng). Tất cả đi qua `kick()` (debounce).
 
 ### G7.3 Ghi lạc quan và xử lý kết quả theo từng op
 
@@ -420,9 +429,19 @@ Ghi lạc quan nằm cùng transaction với `enqueue`. `pending_xp` chỉ là *
 | `SETTINGS_UPDATE` | SettingsScreen | `AppPrefs` đã đổi | userId | `data.settings` → `AppPrefs` | Bỏ qua |
 | `SHOP_PURCHASE` | ShopScreen, chỉ khi **rớt mạng sau khi đã gửi** `POST /v1/shop/purchase` | Không ghi lạc quan; UI "Đang xử lý" | rewardItemId (`op_id` = `Idempotency-Key` đã gửi) | INSERT `user_inventories`, `current_xp` | Snackbar theo `errorCode` |
 
-- [ ] Đăng xuất / đổi tài khoản: `POST /v1/auth/logout {refreshToken}` (bỏ qua lỗi mạng) → xoá Secure Storage → `db.clearUserData()`. Khi đăng nhập, `user_id` khác `local_db_owner_user_id` thì cũng `clearUserData()`.
+- [x] Đăng xuất / đổi tài khoản: `POST /v1/auth/logout {refreshToken}` (bỏ qua lỗi mạng) → xoá Secure Storage → `db.clearUserData()`. Khi đăng nhập, `user_id` khác `local_db_owner_user_id` thì cũng `clearUserData()`.
 
-**DoD G7:** Unit test `srs.dart` cho cùng các ca của `SrsReplayTest` (backend). Test với Dio giả lập: op được gộp đúng; lỗi mạng / `FAILED` / 429 → retry với backoff; `REJECTED` và `DUPLICATE` kèm `errorCode` → rollback đúng bảng G7.3; pull không đè dòng dirty; `deleted` của content xoá đúng dòng; lặp đúng khi `hasMore`. Chạy thêm một lần với backend thật: học offline 5 thẻ → bật mạng → `/v1/sync/pull` trên Swagger thấy đúng dữ liệu.
+**DoD G7:** Unit test `srs.dart` cho cùng các ca của `SrsReplayTest` (backend). Test với Dio giả lập: op được gộp đúng; lỗi mạng / `FAILED` / 429 → retry với backoff; `REJECTED` và `DUPLICATE` kèm `errorCode` → rollback đúng bảng G7.3; pull không đè dòng dirty; `deleted` của content xoá đúng dòng; lặp đúng khi `hasMore`. Chạy thêm một lần với backend thật: học offline 5 thẻ → bật mạng → `/v1/sync/pull` trên Swagger thấy đúng dữ liệu. ⚠️ *Phần test tự động đạt: `srs_test` (cùng 4 ca của `SrsReplayTest` + luật `XpEstimator`), `sync_worker_test` (APPLIED áp `data` + snapshot user; lỗi mạng / 429 / `FAILED` -> backoff; REJECTED review xoá log và phát lại; DUPLICATE kèm `errorCode` trả quest về "chưa nhận" và báo tiến độ; REJECTED bookmark / quiz rollback; CONFLICT ghi chú; 120 op -> 3 lô FIFO; op `in_flight` sót được gửi lại), `pull_service_test` (lặp `hasMore`, cursor, con thiếu cha bị bỏ qua, `deleted` xoá đúng dòng + cascade, không đè dòng dirty, settings), `study_repositories_test`. **Chưa chạy với backend thật** (lúc làm, Docker / backend không chạy): cần làm tay bước "học offline 5 thẻ -> bật mạng -> xem `/v1/sync/pull`".*
+
+*Ghi chú khi làm:*
+- File: `data/sync/{srs, xp_estimator, op_handlers, pull_service, sync_worker, background_sync}.dart`. Không tách `SyncQueueService`: `SyncDao.enqueue` đã là hàng đợi (gộp op, FIFO, backoff); repository gọi nó **trong cùng transaction** với ghi lạc quan.
+- **Cờ dirty:** mọi bảng bị ghi lạc quan (`user_flashcard_progress`, tiến độ topic / ngữ pháp, `user_quests`, `daily_statistics`, ghi chú, bookmark, kho đồ, `user_profile`) đặt `is_dirty = 1`; pull bỏ qua dòng dirty. Khi hàng đợi rỗng sau flush (`pendingCount() == 0`) thì `SyncDao.clearAllDirty()` + `pending_xp = 0`, vì lúc đó mọi thay đổi đã được server xác nhận hoặc từ chối và pull ngay sau sẽ mang số chuẩn về.
+- **FLASHCARD_REVIEW APPLIED:** chỉ ghi đè `user_flashcard_progress` bằng `data.progress` khi không còn review nào khác của thẻ đó đang chờ (`json_extract(payload, '$.flashcardId')`), nếu không bản lạc quan (đã gồm các log sau) bị mất.
+- **`entity_id` của ghi chú = `flashcardId`** (không phải noteId): ghi chú tạo ở máy khác có id khác, còn `flashcard_id` là UNIQUE nên gộp op / áp kết quả luôn đúng dòng.
+- **QUIZ_SUBMIT bị từ chối:** `quiz_attempts` không có cột lỗi nên **xoá** bài làm (cascade answers); `QuizResultScreen` đang watch thấy `null` thì hiện "Bài làm không được ghi nhận / Đề đã được cập nhật".
+- **SHOP_PURCHASE:** gọi REST trước với `Idempotency-Key = newId()`; chỉ khi lỗi kiểu *có thể đã gửi* (`sendTimeout` / `receiveTimeout` / unknown) mới enqueue op cùng `op_id`; `connectionError` / `connectionTimeout` (chưa gửi được) thì báo "Cần kết nối mạng".
+- **Trigger:** `SyncScope` (bọc `MainScreen`) kick khi mở, khi `resumed`, khi `connectivity_plus` báo có mạng; mỗi lần ghi gọi `kick()`; còn op đang backoff thì worker tự hẹn lần gửi lại. `workmanager` 15 phút chỉ bật cho **Android** (iOS cần cấu hình BGTaskScheduler riêng), đăng ký khi đăng nhập (trừ ADMIN), huỷ khi đăng xuất. Thông báo của sync (xung đột, bị từ chối) hiện snackbar qua `syncMessagesProvider`.
+- Mỗi lần flush gửi tối đa 5 lô × 50 op; pull tối đa 10 trang / scope, để không chạm 30 request/phút.
 
 ---
 
@@ -482,11 +501,23 @@ Mỗi màn hình làm theo cùng một khuôn:
 
 ### Đợt 5 — Dọn dẹp
 
-- [ ] 23. Xoá `lib/data/mock_data.dart`; `grep -rn "MockData" lib/` rỗng; `flutter analyze` sạch.
+- [x] 23. Xoá `lib/data/mock_data.dart`; `grep -rn "MockData" lib/` rỗng; `flutter analyze` sạch.
 
 Gợi ý chia việc: một người làm G6 + G7 (hạ tầng); người còn lại làm Đợt 1 ngay khi có G6.5 / G6.7, rồi Đợt 4 (admin không phụ thuộc G7); Đợt 2, 3 làm sau khi G7 xong.
 
-**DoD G8:** `grep -rn MockData lib/` không còn kết quả; mọi màn hình người học chạy được cả online lẫn chế độ máy bay; màn admin báo lỗi rõ ràng khi offline.
+**DoD G8:** `grep -rn MockData lib/` không còn kết quả; mọi màn hình người học chạy được cả online lẫn chế độ máy bay; màn admin báo lỗi rõ ràng khi offline. ⚠️ *Đạt phần kiểm được tự động: `grep -rn MockData lib/` rỗng, `mock_data.dart` đã xoá, `flutter analyze` sạch, 55 test xanh (gồm widget test: Welcome, Login là màn gốc không có nút back, phiên ADMIN vào thẳng `AdminMainScreen`). Màn admin hiện lỗi rõ ràng + nút "Thử lại" khi offline (`AdminAsync`). **Chưa chạy tay trên máy thật / emulator** (online + chế độ máy bay) -> làm ở G9.*
+
+*Ghi chú khi làm:*
+- Providers: `providers.dart` (hạ tầng, API, sync, repository), `content_providers.dart`, `user_providers.dart`. Repository: `data/repositories/study_repositories.dart` (Srs, Note, Bookmark, Lesson, Quiz) và `user_repositories.dart` (Quest, Shop, Profile, Settings, Leaderboard). Admin dùng thẳng `AdminApi` (không cần lớp repository riêng).
+- `FlashcardScreen` **chốt thứ tự thẻ lúc mở màn** (thẻ đến hạn trước) rồi vẫn watch SQLite để cập nhật ghi chú / bookmark, tránh thẻ nhảy chỗ khi box đổi giữa buổi học. Nút mũi tên chỉ chuyển thẻ; Again / Know mới ghi review; thẻ cuối -> `LESSON_COMPLETE` -> `CompletionScreen`. Có nút "Kiểm tra" trên AppBar và ở `CompletionScreen` khi topic có quiz.
+- `GrammarDetailScreen`: cuộn hết **hoặc** bấm nút thì gửi `LESSON_COMPLETE` (1 lần mỗi lượt mở); có quiz thì nút là "Tiếp theo (Làm bài tập)".
+- Điều hướng về trang chủ dùng `popUntil(isFirst)` thay vì `pushAndRemoveUntil(MainScreen)` (giữ `StartGate` làm route gốc). Welcome mở Register bằng `push` (trước là `pushReplacement` sẽ thay mất StartGate).
+- Home: "3/5 bài" = `daily_statistics(hôm nay).lessons_completed` / `daily_goal_lessons`; ReminderDialog tự hiện tối đa 1 lần/ngày khi đã qua giờ nhắc mà hôm nay chưa học. Settings thêm "Giờ nhắc học" và "Rung".
+- Shop: khi offline nút Mua bị khoá và có dải "Cần kết nối mạng để mua"; hạng / đủ XP lấy từ `GET /v1/shop/items` lúc online. Profile thêm "Kho đồ" (chạm để trang bị) và badge hạng từ leaderboard.
+- Leaderboard: `leaderboard_cache` không có cột viền / "hạng của bạn" nên bản offline hiện viền mặc định và không có dòng của mình (dòng "Hạng của bạn" giữ trong bộ nhớ khi đã tải online).
+- **Admin, update là "thay toàn bộ"** (`TopicService/GrammarService/QuizService.apply`): form luôn gửi đủ field. Sửa chủ điểm ngữ pháp từ form nạp `GET /v1/grammar/get/{id}` trước để giữ `content`, `usageNotes`, `examples`; sửa quiz nạp lại câu hỏi hiện có. Quiz mới phải soạn câu hỏi trước rồi mới tạo (server yêu cầu `questions` không rỗng). Ví dụ ngữ pháp / câu hỏi quiz sửa cục bộ, nút "Lưu" gửi một lần.
+- **Hạn chế còn lại:** `TopicResponse` / `GrammarResponse` không trả `sortOrder` nên form admin có ô "Thứ tự hiển thị" mặc định 0 — sửa topic / ngữ pháp mà không nhập lại sẽ đưa nó về 0. Nên thêm `sortOrder` vào 2 response này ở backend (việc phụ).
+- "Hoạt động gần đây" ở dashboard admin bị ẩn (chưa có API).
 
 ---
 

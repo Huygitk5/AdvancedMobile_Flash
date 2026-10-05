@@ -1,50 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import để dùng hiệu ứng rung (Haptic Feedback)
-import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/quest_model.dart'; // Import Model Quest bạn vừa tạo
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ChallengeScreen extends StatefulWidget {
-  const ChallengeScreen({Key? key}) : super(key: key);
+import '../../core/icons.dart';
+import '../../core/theme.dart';
+import '../../models/quest_model.dart';
+import '../../providers/providers.dart';
+import '../../providers/user_providers.dart';
+
+class ChallengeScreen extends ConsumerStatefulWidget {
+  const ChallengeScreen({super.key});
 
   @override
-  State<ChallengeScreen> createState() => _ChallengeScreenState();
+  ConsumerState<ChallengeScreen> createState() => _ChallengeScreenState();
 }
 
-class _ChallengeScreenState extends State<ChallengeScreen> {
-  // Điểm XP tổng hiện tại (giả lập)
-  int totalXp = 120;
-
-  // Sử dụng danh sách Model thay vì Map rời rạc
-  late List<Quest> quests;
-
+class _ChallengeScreenState extends ConsumerState<ChallengeScreen> {
   @override
   void initState() {
     super.initState();
-    // Lấy dữ liệu từ MockData khi khởi tạo màn hình
-    quests = List.from(MockData.quests);
+    // Lần đầu trong ngày chưa có nhiệm vụ local: online thì gọi /v1/quests/today rồi pull.
+    ref.read(questRepositoryProvider).ensureToday();
   }
 
-  // Hàm xử lý khi bấm Nhận thưởng
-  void _claimReward(int index) {
-    // Kích hoạt rung nhẹ trên điện thoại
-    HapticFeedback.mediumImpact();
+  /// Nhận thưởng: ghi lạc quan + QUEST_CLAIM. Server từ chối thì nút quay lại "Nhận" và có snackbar.
+  Future<void> _claimReward(Quest quest) async {
+    if (ref.read(appPrefsProvider).isVibrationEnabled) HapticFeedback.mediumImpact();
+    await ref.read(questRepositoryProvider).claim(quest);
+    if (!mounted) return;
 
-    setState(() {
-      quests[index].isClaimed = true; // Cập nhật thuộc tính của Model
-      totalXp += quests[index].xp;
-    });
-
-    // Hiển thị thông báo nhận XP
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.stars, color: Colors.amber),
+            const Icon(Icons.stars, color: Colors.amber),
             const SizedBox(width: 10),
             Text(
-              'Tuyệt vời! Bạn nhận được +${quests[index].xp} XP',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              'Tuyệt vời! Bạn nhận được +${quest.xp} XP',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ],
         ),
@@ -59,6 +52,9 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final totalXp = ref.watch(profileProvider).value?.displayXp ?? 0;
+    final questsAsync = ref.watch(questsProvider);
+    final quests = questsAsync.value ?? const <Quest>[];
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -80,14 +76,14 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
               ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))
+                BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))
               ],
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Theme.of(context).cardColor.withOpacity(0.2), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Theme.of(context).cardColor.withValues(alpha: 0.2), shape: BoxShape.circle),
                   child: Icon(Icons.stars, color: Colors.amber, size: 40),
                 ),
                 const SizedBox(width: 15),
@@ -119,19 +115,26 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
           Text('Nhiệm vụ hôm nay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, )),
           const SizedBox(height: 15),
 
-          // Render danh sách nhiệm vụ từ biến state truyền trực tiếp object Quest
-          ...List.generate(quests.length, (index) {
-            return _buildQuestItem(quests[index], index);
-          }),
+          if (quests.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: Center(
+                child: questsAsync.isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('Chưa có nhiệm vụ. Kết nối mạng để nhận nhiệm vụ hôm nay.',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppTheme.greyColor)),
+              ),
+            ),
+          ...quests.map(_buildQuestItem),
         ],
       ),
     );
   }
 
   // Widget nhận tham số là 1 object Model Quest thay vì các biến rời rạc
-  Widget _buildQuestItem(Quest quest, int index) {
-    bool isCompleted = quest.current >= quest.target;
-    double progress = quest.current / quest.target;
+  Widget _buildQuestItem(Quest quest) {
+    final isCompleted = quest.isCompleted;
+    final progress = quest.progress;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -146,7 +149,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
           ),
           boxShadow: [
             if (!quest.isClaimed && isCompleted)
-              BoxShadow(color: Colors.amber.withOpacity(0.15), blurRadius: 10, spreadRadius: 2)
+              BoxShadow(color: Colors.amber.withValues(alpha: 0.15), blurRadius: 10, spreadRadius: 2)
           ]
       ),
       child: Row(
@@ -157,7 +160,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                 color: quest.isClaimed ? Colors.green.shade50 : Colors.blue.shade50,
                 shape: BoxShape.circle
             ),
-            child: Icon(quest.icon, color: quest.isClaimed ? Colors.green : AppTheme.primaryColor),
+            child: Icon(iconFor(quest.iconName), color: quest.isClaimed ? Colors.green : AppTheme.primaryColor),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -203,7 +206,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              onPressed: () => _claimReward(index),
+              onPressed: () => _claimReward(quest),
               child: Text('Nhận', style: TextStyle(fontWeight: FontWeight.bold)),
             )
                 : Text(

@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme.dart';
-import '../main/main_screen.dart';
+import '../../providers/providers.dart';
 import '../auth/login_screen.dart';
 import '../auth/register_screen.dart';
 
+class WelcomeScreen extends ConsumerWidget {
+  const WelcomeScreen({super.key});
 
-class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({Key? key}) : super(key: key);
+  /// Đã qua Welcome thì lần sau (chưa đăng nhập) mở thẳng LoginScreen.
+  void _open(BuildContext context, WidgetRef ref, Widget screen) {
+    ref.read(appPrefsProvider).setOnboardingCompleted(true);
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -70,12 +77,7 @@ class WelcomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  },
+                  onPressed: () => _open(context, ref, const LoginScreen()),
                   child: Text('Đăng nhập', style: TextStyle(fontSize: 16, color: AppTheme.primaryColor)),
                 ),
               ),
@@ -92,12 +94,7 @@ class WelcomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                    );
-                  },
+                  onPressed: () => _open(context, ref, const RegisterScreen()),
                   child: Text('Đăng ký', style: TextStyle(fontSize: 16, color: Theme.of(context).cardColor)),
                 ),
               ),
