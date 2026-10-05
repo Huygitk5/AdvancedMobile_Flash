@@ -4,6 +4,7 @@ import com.flash.gamification.dto.LeaderboardResponse;
 import com.flash.gamification.entity.RankBoard;
 import com.flash.gamification.repository.UserInventoryRepository;
 import com.flash.user.entity.User;
+import com.flash.user.entity.UserRole;
 import com.flash.user.entity.UserStatus;
 import com.flash.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -43,11 +44,11 @@ public class LeaderboardService {
 
     /** Hạng theo RANK() (số người điểm cao hơn + 1); null nếu user không xuất hiện trên bảng. */
     public Integer rankOf(RankBoard board, User user) {
-        if (user.getStatus() != UserStatus.ACTIVE || user.getDeletedAt() != null) {
+        if (user.getStatus() != UserStatus.ACTIVE || user.getDeletedAt() != null || user.getRole() != UserRole.USER) {
             return null;
         }
         Long higher = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE' "
-                + "AND deleted_at IS NULL AND " + scoreColumn(board) + " > ?", Long.class, scoreOf(board, user));
+                + "AND deleted_at IS NULL AND role = 'USER' AND " + scoreColumn(board) + " > ?", Long.class, scoreOf(board, user));
         return higher == null ? null : higher.intValue() + 1;
     }
 
@@ -65,7 +66,7 @@ public class LeaderboardService {
 
     private List<LeaderboardResponse.Entry> loadTop(RankBoard board, int limit) {
         String view = board == RankBoard.XP ? "v_leaderboard_xp" : "v_leaderboard_streak";
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT user_id, full_name, avatar_url, score, rank_no "
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT user_id, full_name, avatar_url, slogan, score, rank_no "
                 + "FROM " + view + " ORDER BY rank_no, full_name LIMIT ?", limit);
         if (rows.isEmpty()) {
             return List.of();
@@ -74,13 +75,18 @@ public class LeaderboardService {
         Map<UUID, List<Long>> borders = inventoryRepository.findEquippedBorders(userIds).stream()
                 .collect(Collectors.toMap(r -> (UUID) r[0], r -> rewardItemService.readColors((String) r[1]), (a, b) -> a));
 
+        Map<UUID, String> avatars = inventoryRepository.findEquippedAvatars(userIds).stream()
+                .collect(Collectors.toMap(r -> (UUID) r[0], r -> (String) r[1], (a, b) -> a));
+
         return rows.stream().map(r -> {
             UUID id = UUID.fromString((String) r.get("user_id"));
             return LeaderboardResponse.Entry.builder()
                     .rank(((Number) r.get("rank_no")).intValue())
                     .userId(id)
                     .fullName((String) r.get("full_name"))
-                    .avatarUrl((String) r.get("avatar_url"))
+                    // Ảnh đại diện đang trang bị trong shop được ưu tiên hơn ảnh gốc của tài khoản
+                    .avatarUrl(avatars.getOrDefault(id, (String) r.get("avatar_url")))
+                    .slogan((String) r.get("slogan"))
                     .equippedBorderColors(borders.get(id))
                     .score(((Number) r.get("score")).longValue())
                     .build();

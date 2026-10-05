@@ -1,4 +1,5 @@
 import '../../core/clock.dart';
+import '../../core/l10n.dart';
 import '../../models/_json.dart';
 import '../local/app_database.dart';
 import '../local/converters.dart';
@@ -47,7 +48,7 @@ class OpHandlers {
           await _q.markDone(op.id);
         });
         if (settings != null) await onSettings?.call(settings!);
-        return (OpOutcome.done, status == 'CONFLICT_SERVER_WINS' ? 'Đã cập nhật từ thiết bị khác' : null);
+        return (OpOutcome.done, status == 'CONFLICT_SERVER_WINS' ? tr('Đã cập nhật từ thiết bị khác') : null);
 
       case 'REJECTED' || 'DUPLICATE':
         final code = errorCode ?? 'REJECTED';
@@ -161,7 +162,9 @@ class OpHandlers {
         await db.lessonDao.delete(op.entityId);
         if (row != null) {
           await db.statsDao.bump(localDateKey(fromEpoch(row.completedAt)!), lessonsCompleted: -1);
-          await db.profileDao.bumpCounters(completedLessons: -1);
+          // completedLessons chỉ tăng ở lần hoàn thành đầu tiên của bài: còn lần khác thì giữ nguyên
+          final stillDone = await db.lessonDao.existsFor(topicId: row.topicId, grammarLessonId: row.grammarLessonId);
+          if (!stillDone) await db.profileDao.bumpCounters(completedLessons: -1);
           await db.profileDao.addPendingXp(-XpEstimator.lessonXp);
         }
         return null;
@@ -170,8 +173,8 @@ class OpHandlers {
         // Không có cột "lỗi" ở quiz_attempts: xoá bài làm, màn kết quả sẽ báo bị từ chối.
         await db.quizDao.delete(op.entityId);
         return code == 'BUSINESS_RULE_VIOLATION'
-            ? 'Đề đã được cập nhật, hãy làm lại bài kiểm tra.'
-            : 'Bài kiểm tra không được ghi nhận: ${_message(code, serverMessage)}';
+            ? tr('Đề đã được cập nhật, hãy làm lại bài kiểm tra.')
+            : trf('Bài kiểm tra không được ghi nhận: {e}', {'e': _message(code, serverMessage)});
 
       case 'NOTE_UPSERT' || 'NOTE_DELETE':
         // Lấy lại từ server ở lần pull sau.
@@ -192,7 +195,9 @@ class OpHandlers {
         await db.questDao.setClaimed(op.entityId, false, null);
         if (quest != null) await db.profileDao.addPendingXp(-quest.xpReward);
         final msg = _message(code, serverMessage);
-        return code == 'QUEST_NOT_COMPLETED' && quest != null ? '$msg Tiến độ ${quest.current}/${quest.target}.' : msg;
+        return code == 'QUEST_NOT_COMPLETED' && quest != null
+            ? '$msg ${trf('Tiến độ {c}/{t}.', {'c': quest.current, 't': quest.target})}'
+            : msg;
 
       case 'PROFILE_UPDATE':
         await db.profileDao.markClean(nowMs);
@@ -203,7 +208,7 @@ class OpHandlers {
         return _message(code, serverMessage);
 
       case 'SHOP_PURCHASE':
-        return 'Mua vật phẩm thất bại: ${_message(code, serverMessage)}';
+        return trf('Mua vật phẩm thất bại: {e}', {'e': _message(code, serverMessage)});
 
       default: // SETTINGS_UPDATE: bỏ qua
         return null;

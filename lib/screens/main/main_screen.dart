@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../home/home_screen.dart';
 import '../vocabulary/topic_screen.dart';
@@ -37,13 +38,13 @@ class _MainScreenState extends State<MainScreen> {
   static const double _barHeight = 60; // thanh nền
   static const double _bump = 20;      // độ cao vòng cung
 
-  static const List<_NavData> _navItems = [
-    _NavData(Icons.home_filled, 'Trang chủ', Color(0xFF3366FF)),
-    _NavData(Icons.menu_book, 'Học tập', Color(0xFF2FBF71)),
-    _NavData(Icons.bar_chart, 'Tiến độ', Color(0xFF8B5CF6)),
-    _NavData(Icons.emoji_events_outlined, 'Thử thách', Color(0xFFFF9F1C)),
-    _NavData(Icons.person_outline, 'Cá nhân', Color(0xFFFF5C7A)),
-  ];
+  List<_NavData> get _navItems => [
+        _NavData(Icons.home_filled, tr('Trang chủ'), const Color(0xFF3366FF)),
+        _NavData(Icons.menu_book, tr('Học tập'), const Color(0xFF2FBF71)),
+        _NavData(Icons.bar_chart, tr('Tiến độ'), const Color(0xFF8B5CF6)),
+        _NavData(Icons.emoji_events_outlined, tr('Thử thách'), const Color(0xFFFF9F1C)),
+        _NavData(Icons.person_outline, tr('Cá nhân'), const Color(0xFFFF5C7A)),
+      ];
 
   Widget _buildCustomNavBar() {
     // Bỏ SafeArea để thanh nền chạm sát đáy, phần inset được tô cùng màu nền
@@ -138,30 +139,30 @@ class _MainScreenState extends State<MainScreen> {
             final tc = t.clamp(0.0, 1.0); // dùng cho màu (tránh vượt 0..1 do easeOutBack)
             final color = Color.lerp(AppTheme.greyColor, item.color, tc)!;
 
+            // Chỉ hiện icon; tab đang chọn mới hiện thêm tên. Icon chưa chọn nằm giữa thanh, icon đang chọn nhô lên vòng cung.
             return Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Icon: nhô lên + to ra
                 Transform.translate(
-                  offset: Offset(0, -12 * t),
+                  offset: Offset(0, -12 * t + 9 * (1 - tc)),
                   child: Transform.scale(
                     scale: 1 + 0.35 * t,
                     child: Icon(item.icon, size: 26, color: color),
                   ),
                 ),
                 const SizedBox(height: 4),
-                // Text: nhích lên + to ra theo icon
-                Transform.translate(
-                  offset: Offset(0, -3 * t),
-                  child: Transform.scale(
-                    scale: 1 + 0.2 * t,
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: color,
+                Opacity(
+                  opacity: tc,
+                  child: Transform.translate(
+                    offset: Offset(0, -3 * t),
+                    child: Transform.scale(
+                      scale: 1 + 0.2 * t,
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.visible,
+                        softWrap: false,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
                       ),
                     ),
                   ),

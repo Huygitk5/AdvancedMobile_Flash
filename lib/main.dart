@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/config.dart';
+import 'core/l10n.dart';
+import 'core/speech.dart';
 import 'core/theme.dart';
 import 'data/local/app_database.dart';
 import 'data/sync/background_sync.dart';
@@ -14,6 +17,10 @@ Future<void> main() async {
   // Đọc cài đặt TRƯỚC runApp để theme đúng ngay khung hình đầu tiên (không bị nháy).
   final prefs = await AppPrefs.load();
   themeNotifier.value = prefs.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+  AppLocale.apply(prefs.appLanguage);
+  SpeechService.soundEnabled = prefs.isSoundEnabled;
+  // Địa chỉ máy chủ người dùng tự nhập (nếu có) phải nạp trước khi dựng ApiClient.
+  await AppConfig.load();
 
   final db = AppDatabase();
   await BackgroundSync.initialize();

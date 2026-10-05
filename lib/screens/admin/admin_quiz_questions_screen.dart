@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../models/quiz_model.dart';
 import '../../providers/providers.dart';
+import '../../widgets/common.dart';
 import 'admin_common.dart';
 
 /// Body của POST /v1/quizzes/create và PUT /v1/quizzes/update/{id} (thay TOÀN BỘ câu hỏi).
@@ -18,14 +20,130 @@ Map<String, dynamic> quizBody(Quiz q, List<QuizQuestion> questions) => {
       'questions': [
         for (final x in questions)
           {
-            'questionText': x.questionText,
-            'options': x.options,
+            'questionText': x.questionText.trim(),
+            'options': x.options.map((o) => o.trim()).toList(),
             'correctOptionIndex': x.correctAnswerIndex,
-            'explanation': x.explanation.isEmpty ? null : x.explanation,
+            'explanation': x.explanation.trim().isEmpty ? null : x.explanation.trim(),
+            // Câu sinh từ từ vựng: giữ liên kết khi sửa đề
             'flashcardId': x.flashcardId,
           },
       ],
     };
+
+/// Hộp thoại thêm / sửa một câu hỏi (4 đáp án, chọn đáp án đúng). Trả về câu đã sửa, null nếu huỷ.
+Future<QuizQuestion?> showQuizQuestionDialog(BuildContext context, {QuizQuestion? existing, String quizId = ''}) {
+  return showDialog<QuizQuestion>(context: context, builder: (_) => _QuestionDialog(existing: existing, quizId: quizId));
+}
+
+class _QuestionDialog extends StatefulWidget {
+  final QuizQuestion? existing;
+  final String quizId;
+
+  const _QuestionDialog({required this.existing, required this.quizId});
+
+  @override
+  State<_QuestionDialog> createState() => _QuestionDialogState();
+}
+
+class _QuestionDialogState extends State<_QuestionDialog> {
+  late final TextEditingController _text = TextEditingController(text: widget.existing?.questionText ?? '');
+  late final TextEditingController _explanation = TextEditingController(text: widget.existing?.explanation ?? '');
+  late final List<TextEditingController> _options = List.generate(4, (i) {
+    final opts = widget.existing?.options ?? const <String>[];
+    return TextEditingController(text: i < opts.length ? opts[i] : '');
+  });
+  late int _correct = (widget.existing?.correctAnswerIndex ?? 0).clamp(0, 3);
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _explanation.dispose();
+    for (final c in _options) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _apply() {
+    final options = _options.map((c) => c.text.trim()).toList();
+    if (_text.text.trim().isEmpty || options.any((o) => o.isEmpty)) {
+      showAppSnack(context, tr('Cần nhập câu hỏi và đủ 4 đáp án'), error: true);
+      return;
+    }
+    if (options.toSet().length != 4) {
+      showAppSnack(context, tr('Các đáp án không được trùng nhau'), error: true);
+      return;
+    }
+    final existing = widget.existing;
+    Navigator.pop(
+      context,
+      QuizQuestion(
+        id: existing?.id ?? '',
+        quizId: existing?.quizId ?? widget.quizId,
+        topicId: existing?.topicId,
+        flashcardId: existing?.flashcardId,
+        questionText: _text.text.trim(),
+        options: options,
+        correctAnswerIndex: _correct,
+        explanation: _explanation.text.trim(),
+        sortOrder: existing?.sortOrder ?? 0,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(widget.existing == null ? tr('Thêm Câu hỏi') : tr('Sửa Câu hỏi'), style: const TextStyle(fontWeight: FontWeight.bold)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: _text, maxLines: 3, decoration: adminInputDeco(context, tr('Nội dung câu hỏi'))),
+            formGap(12),
+            RadioGroup<int>(
+              groupValue: _correct,
+              onChanged: (v) => setState(() => _correct = v ?? _correct),
+              child: Column(
+                children: [
+                  for (var i = 0; i < 4; i++) ...[
+                    Row(
+                      children: [
+                        Radio<int>(value: i),
+                        Expanded(
+                          child: TextField(
+                            controller: _options[i],
+                            decoration: adminInputDeco(context, '${tr('Đáp án')} ${String.fromCharCode(65 + i)}'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    formGap(8),
+                  ],
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(tr('Chọn nút tròn ở đáp án đúng'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+            ),
+            formGap(10),
+            TextField(controller: _explanation, maxLines: 3, decoration: adminInputDeco(context, tr('Giải thích đáp án'))),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+          onPressed: _apply,
+          child: Text(tr('Xong'), style: const TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
 
 /// Sửa danh sách câu hỏi cục bộ rồi bấm "Lưu" gửi một lần.
 /// Lưu ý: sửa đề làm các bài đang làm offline của học viên bị từ chối khi đồng bộ.
@@ -33,7 +151,7 @@ class AdminQuizQuestionsScreen extends ConsumerStatefulWidget {
   final String? quizId;
   final String quizTitle;
 
-  /// Quiz chưa tạo (từ QuizFormScreen): "Lưu" sẽ gọi create.
+  /// Quiz chưa tạo: "Lưu" sẽ gọi create.
   final Quiz? draft;
 
   const AdminQuizQuestionsScreen({super.key, required String this.quizId, required this.quizTitle}) : draft = null;
@@ -85,7 +203,7 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
     final q = _quiz;
     if (q == null) return;
     if (questions.isEmpty) {
-      await adminRun(context, () async => throw Exception('Cần ít nhất 1 câu hỏi'));
+      showAppSnack(context, tr('Bài kiểm tra cần ít nhất 1 câu hỏi'), error: true);
       return;
     }
     setState(() => _saving = true);
@@ -93,7 +211,7 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
     final ok = await adminRun(
       context,
       () => _creating ? api.createQuiz(quizBody(q, questions)) : api.updateQuiz(q.id, quizBody(q, questions)),
-      success: 'Đã lưu bài kiểm tra',
+      success: tr('Đã lưu bài kiểm tra'),
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -105,81 +223,17 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
     }
   }
 
-  void _showQuestionFormDialog({QuizQuestion? existingQuestion, int? index}) {
-    final qController = TextEditingController(text: existingQuestion?.questionText ?? '');
-    String opt(int i) => (existingQuestion?.options.length ?? 0) > i ? existingQuestion!.options[i] : '';
-    final optControllers = List.generate(4, (i) => TextEditingController(text: opt(i)));
-    final expController = TextEditingController(text: existingQuestion?.explanation ?? '');
-
-    int selectedCorrectIndex = existingQuestion?.correctAnswerIndex ?? 0;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setStateDialog) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(existingQuestion == null ? 'Thêm Câu hỏi' : 'Sửa Câu hỏi', style: const TextStyle(fontWeight: FontWeight.bold)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(controller: qController, maxLines: 2, decoration: adminInputDeco('Nội dung câu hỏi')),
-                    const SizedBox(height: 15),
-                    for (var i = 0; i < 4; i++) ...[
-                      TextField(controller: optControllers[i], decoration: adminInputDeco('Đáp án ${'ABCD'[i]}')),
-                      const SizedBox(height: 10),
-                    ],
-                    const SizedBox(height: 5),
-                    DropdownButtonFormField<int>(
-                      initialValue: selectedCorrectIndex,
-                      decoration: adminInputDeco('Đáp án đúng'),
-                      items: const [
-                        DropdownMenuItem(value: 0, child: Text('A')),
-                        DropdownMenuItem(value: 1, child: Text('B')),
-                        DropdownMenuItem(value: 2, child: Text('C')),
-                        DropdownMenuItem(value: 3, child: Text('D')),
-                      ],
-                      onChanged: (val) => setStateDialog(() => selectedCorrectIndex = val!),
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(controller: expController, maxLines: 2, decoration: adminInputDeco('Giải thích đáp án')),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                  onPressed: () {
-                    final options = optControllers.map((c) => c.text.trim()).toList();
-                    if (qController.text.trim().isEmpty || options.any((o) => o.isEmpty)) return;
-                    setState(() {
-                      final newQuestion = QuizQuestion(
-                        id: existingQuestion?.id ?? '',
-                        quizId: widget.quizId ?? '',
-                        flashcardId: existingQuestion?.flashcardId,
-                        questionText: qController.text.trim(),
-                        options: options,
-                        correctAnswerIndex: selectedCorrectIndex,
-                        explanation: expController.text.trim(),
-                      );
-                      if (index == null) {
-                        questions.add(newQuestion);
-                      } else {
-                        questions[index] = newQuestion;
-                      }
-                      _dirty = true;
-                    });
-                    Navigator.pop(dialogContext);
-                  },
-                  child: Text('Xong', style: TextStyle(color: Theme.of(dialogContext).cardColor)),
-                ),
-              ],
-            );
-          }
-      ),
-    );
+  Future<void> _edit({QuizQuestion? existing, int? index}) async {
+    final edited = await showQuizQuestionDialog(context, existing: existing, quizId: widget.quizId ?? '');
+    if (edited == null || !mounted) return;
+    setState(() {
+      if (index == null) {
+        questions.add(edited);
+      } else {
+        questions[index] = edited;
+      }
+      _dirty = true;
+    });
   }
 
   @override
@@ -188,14 +242,15 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
-        title: Text('Quiz: ${widget.quizTitle}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text('Quiz: ${widget.quizTitle}',
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         actions: [
           TextButton.icon(
             onPressed: (_dirty || _creating) && !_saving ? _save : null,
             icon: _saving
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save_outlined),
-            label: Text(_creating ? 'Tạo' : 'Lưu'),
+            label: Text(_creating ? tr('Tạo') : tr('Lưu')),
           ),
         ],
       ),
@@ -210,36 +265,47 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
                 margin: const EdgeInsets.only(bottom: 15),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(12)),
-                child: const Text(
-                  'Có thay đổi chưa lưu. Lưu ý: sửa đề sẽ làm các bài học viên đang làm offline bị từ chối khi đồng bộ.',
-                  style: TextStyle(fontSize: 13),
+                child: Text(
+                  tr('Có thay đổi chưa lưu. Lưu ý: sửa đề sẽ làm các bài học viên đang làm offline bị từ chối khi đồng bộ.'),
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
                 ),
               ),
             if (questions.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 60),
-                child: Center(child: Text('Chưa có câu hỏi nào.', style: TextStyle(color: AppTheme.greyColor))),
+              Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: EmptyView(message: tr('Chưa có câu hỏi nào.'), icon: Icons.quiz_outlined),
               ),
             ...List.generate(questions.length, (index) {
               final q = questions[index];
+              final correct = q.correctAnswerIndex.clamp(0, 3);
               return Card(
-                elevation: 2, margin: const EdgeInsets.only(bottom: 15),
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(15),
-                  title: Text('Câu ${index + 1}: ${q.questionText}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  title: Text(trf('Câu {n}: {q}', {'n': index + 1, 'q': q.questionText}),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 8.0),
-                    child: Text('Đ/A đúng: ${'ABCD'[q.correctAnswerIndex.clamp(0, 3)]}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      '${tr('Đáp án đúng')}: ${'ABCD'[correct]}${q.options.length > correct ? '. ${q.options[correct]}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(icon: const Icon(Icons.edit, color: Colors.amber), onPressed: () => _showQuestionFormDialog(existingQuestion: q, index: index)),
-                      IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() {
-                        questions.removeAt(index);
-                        _dirty = true;
-                      })),
+                      IconButton(icon: const Icon(Icons.edit, color: Colors.amber), onPressed: () => _edit(existing: q, index: index)),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => setState(() {
+                          questions.removeAt(index);
+                          _dirty = true;
+                        }),
+                      ),
                     ],
                   ),
                 ),
@@ -250,9 +316,9 @@ class _AdminQuizQuestionsScreenState extends ConsumerState<AdminQuizQuestionsScr
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: Colors.redAccent,
-        onPressed: () => _showQuestionFormDialog(),
-        icon: Icon(Icons.add, color: Theme.of(context).cardColor),
-        label: Text('Thêm Câu hỏi', style: TextStyle(color: Theme.of(context).cardColor)),
+        onPressed: () => _edit(),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(tr('Thêm Câu hỏi'), style: const TextStyle(color: Colors.white)),
       ),
     );
   }

@@ -3,6 +3,7 @@ package com.flash.auth;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.flash.auth.google.GoogleTokenVerifier;
 import com.flash.auth.google.GoogleUserInfo;
+import com.flash.auth.entity.OtpPurpose;
 import com.flash.auth.mail.OtpSender;
 import com.flash.support.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
@@ -191,7 +192,7 @@ class AuthFlowIntegrationTest extends IntegrationTestBase {
 
     private String captureOtp(String email) {
         ArgumentCaptor<String> otp = ArgumentCaptor.forClass(String.class);
-        verify(otpSender).sendPasswordResetOtp(eq(email), anyString(), otp.capture());
+        verify(otpSender).sendOtp(eq(email), anyString(), eq(OtpPurpose.PASSWORD_RESET), otp.capture());
         return otp.getValue();
     }
 }

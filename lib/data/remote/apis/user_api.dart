@@ -10,11 +10,20 @@ class UserApi {
   /// `UserResponse`.
   Future<Map<String, dynamic>> me() async => await _c.get('/v1/users/me') as Map<String, dynamic>;
 
-  /// Trả cặp token mới (mọi refresh token cũ bị thu hồi).
-  Future<AuthDto> changePassword({String? currentPassword, required String newPassword, required String deviceId}) async =>
+  /// Gửi OTP xác nhận đổi mật khẩu tới email của tài khoản.
+  Future<void> requestChangePasswordOtp() => _c.post('/v1/users/change-password/otp');
+
+  /// Trả cặp token mới (mọi refresh token cũ bị thu hồi). [otp] bắt buộc khi server bật xác thực email.
+  Future<AuthDto> changePassword({
+    String? currentPassword,
+    required String newPassword,
+    String? otp,
+    required String deviceId,
+  }) async =>
       AuthDto.fromJson(await _c.put('/v1/users/change-password', body: {
         'currentPassword': ?currentPassword,
         'newPassword': newPassword,
+        'otp': ?otp,
         'deviceId': deviceId,
       }) as Map<String, dynamic>);
 

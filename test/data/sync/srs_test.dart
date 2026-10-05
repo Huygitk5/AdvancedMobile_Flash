@@ -37,6 +37,13 @@ void main() {
     expect(s.againCount, 1);
   });
 
+  test('đã học ngay từ lần Know đầu tiên; Again về box 0 thì mất trạng thái', () {
+    final first = log('KNOW', t0);
+    expect(Srs.replay([first]).isLearned, isTrue);
+    expect(Srs.replay([first]).box, 1);
+    expect(Srs.replay([first, log('AGAIN', t0.add(const Duration(minutes: 1)))]).isLearned, isFalse);
+  });
+
   test('Again không bao giờ xuống dưới 0', () {
     final s = Srs.replay([log('KNOW', t0), log('AGAIN', t0.add(const Duration(seconds: 60)))]);
     expect(s.box, 0);
@@ -68,10 +75,11 @@ void main() {
       expect(XpEstimator.review(isKnow: false, firstKnowOfCardToday: false, knowXpToday: 0, becameLearnedFirstTime: false), 0);
     });
 
-    test('bài học +10 cho 20 bài đầu mỗi ngày', () {
+    test('bài học +10 cho 20 bài đầu mỗi ngày, học lại cùng bài trong ngày không cộng', () {
       expect(XpEstimator.lesson(lessonsBeforeToday: 0), 10);
       expect(XpEstimator.lesson(lessonsBeforeToday: 19), 10);
       expect(XpEstimator.lesson(lessonsBeforeToday: 20), 0);
+      expect(XpEstimator.lesson(lessonsBeforeToday: 3, sameLessonToday: true), 0);
     });
 
     test('quiz +2/câu đúng, +10 khi 100%, chỉ lần đầu trong ngày', () {

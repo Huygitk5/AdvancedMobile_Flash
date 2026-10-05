@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/clock.dart';
 import '../data/local/converters.dart';
 import '../data/local/daos/content_dao.dart';
+import '../data/repositories/base_repository.dart';
 import '../models/daily_statistic_model.dart';
 import '../models/leaderboard_model.dart';
 import '../models/lesson_model.dart';
@@ -18,6 +19,12 @@ final profileProvider = StreamProvider<UserModel?>((ref) => ref.watch(dbProvider
 final todayStatsProvider = StreamProvider.autoDispose<DailyStatistic?>(
   (ref) => ref.watch(dbProvider).statsDao.watchDay(localDateKey(Clock.now())),
 );
+
+/// "3/5 bài" hôm nay: số bài KHÁC NHAU đã hoàn thành (học lại cùng một bài chỉ tính một lần, giống server).
+final todayLessonsDoneProvider = StreamProvider.autoDispose<int>((ref) {
+  final (start, end) = WriteRepository.dayBounds(Clock.now());
+  return ref.watch(dbProvider).lessonDao.watchDistinctBetween(start, end);
+});
 
 /// Nhiệm vụ kỳ hiện tại (ngày / tuần / một lần).
 final questsProvider = StreamProvider.autoDispose<List<Quest>>(
@@ -39,7 +46,8 @@ final leaderboardProvider = FutureProvider.autoDispose.family<Leaderboard?, Stri
   (ref, board) => ref.watch(leaderboardRepositoryProvider).load(board),
 );
 
-/// Biểu đồ Tiến độ: 'WEEK' | 'MONTH' | 'ALL'.
+/// 'WEEK' | 'MONTH' | 'ALL'. Màn Tiến độ đọc 'ALL' rồi tự lọc theo khoảng (gồm cả Năm / Tuỳ chọn)
+/// bằng `Statistics.of`.
 final statsRangeProvider = StreamProvider.autoDispose.family<List<DailyStatistic>, String>((ref, range) {
   final dao = ref.watch(dbProvider).statsDao;
   final today = Clock.now();
@@ -87,8 +95,13 @@ final homeLessonsProvider = StreamProvider.autoDispose<({Lesson? continueLesson,
   });
 });
 
-/// Tổng số từ vựng trong cache (thẻ "Từ vựng" ở Home).
+/// Tổng số từ vựng / chủ đề trong cache (thẻ "Từ vựng" ở Home).
 final contentCountsProvider = StreamProvider.autoDispose<({int topics, int words})>((ref) =>
     ref.watch(dbProvider).contentDao.watchTopicsWithProgress(filter: ProgressFilter.all).map(
           (ts) => (topics: ts.length, words: ts.fold(0, (s, t) => s + t.totalWords)),
         ));
+
+/// Số chủ điểm ngữ pháp trong cache (thẻ "Ngữ pháp" ở Home).
+final grammarCountProvider = StreamProvider.autoDispose<int>(
+  (ref) => ref.watch(dbProvider).contentDao.watchGrammarWithProgress().map((gs) => gs.length),
+);

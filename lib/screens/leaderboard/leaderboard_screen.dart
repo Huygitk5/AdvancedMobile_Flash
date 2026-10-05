@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../models/leaderboard_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
+import '../../widgets/common.dart';
+import '../profile/profile_screen.dart' show borderColorsOf;
 
 /// Top 10 XP / Streak: gọi API khi online và cache quá 5 phút; offline hiện bản cache.
 class LeaderboardScreen extends ConsumerWidget {
@@ -18,14 +21,13 @@ class LeaderboardScreen extends ConsumerWidget {
         appBar: AppBar(
           elevation: 0,
           leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
-          title: const Text('Top 10 Vinh Danh', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          centerTitle: true,
-          bottom: const TabBar(
+          title: Text(tr('Top 10 Vinh Danh'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          bottom: TabBar(
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: AppTheme.greyColor,
             indicatorColor: AppTheme.primaryColor,
             indicatorWeight: 3,
-            tabs: [Tab(text: 'Tổng Point (XP)'), Tab(text: 'Chuỗi Streak')],
+            tabs: [Tab(text: tr('Tổng Point (XP)')), Tab(text: tr('Chuỗi Streak'))],
           ),
         ),
         body: const TabBarView(
@@ -46,6 +48,8 @@ class _BoardView extends ConsumerWidget {
 
   bool get isXp => board == 'XP';
 
+  String get _unit => isXp ? 'Point' : tr('Ngày');
+
   Future<void> _refresh(WidgetRef ref) async {
     await ref.read(leaderboardRepositoryProvider).load(board, force: true);
     ref.invalidate(leaderboardProvider(board));
@@ -54,23 +58,31 @@ class _BoardView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lb = ref.watch(leaderboardProvider(board));
+    final myId = ref.watch(profileProvider).value?.id;
     return lb.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Không tải được bảng xếp hạng: $e')),
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(message: trf('Không tải được bảng xếp hạng: {e}', {'e': e}), onRetry: () => _refresh(ref)),
       data: (data) => RefreshIndicator(
         onRefresh: () => _refresh(ref),
-        child: data == null || data.items.isEmpty
-            ? ListView(children: const [
-                SizedBox(height: 120),
-                Center(child: Text('Cần kết nối mạng để xem bảng xếp hạng.', style: TextStyle(color: AppTheme.greyColor))),
+        child: data == null
+            ? ListView(children: [
+                SizedBox(
+                    height: 300,
+                    child: EmptyView(message: tr('Cần kết nối mạng để xem bảng xếp hạng.'), icon: Icons.cloud_off_rounded)),
               ])
-            : ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  if (data.me != null) _buildMe(context, ref, data.me!),
-                  ...data.items.map((e) => _buildEntry(context, e)),
-                ],
-              ),
+            : data.items.isEmpty
+                ? ListView(children: [
+                    SizedBox(
+                        height: 300,
+                        child: EmptyView(message: tr('Chưa có ai trên bảng xếp hạng'), icon: Icons.emoji_events_outlined)),
+                  ])
+                : ListView(
+                    padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
+                    children: [
+                      if (data.me != null) _buildMe(context, ref, data.me!),
+                      ...data.items.map((e) => _entryCard(context, e, isMe: e.userId == myId)),
+                    ],
+                  ),
       ),
     );
   }
@@ -96,82 +108,89 @@ class _BoardView extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Hạng của bạn', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                Text(user?.fullName ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(tr('Hạng của bạn'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                Text(user?.fullName ?? '',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ],
             ),
           ),
-          Text('${me.score}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
+          Text('${me.score}',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
           const SizedBox(width: 4),
-          Text(isXp ? 'Point' : 'Ngày', style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(_unit, style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildEntry(BuildContext context, LeaderboardEntry user) {
-    final rank = user.rank;
-    final border = user.equippedBorderColors.map((c) => Color(c)).toList();
-    final hasAvatar = (user.avatarUrl ?? '').isNotEmpty;
-    final initial = user.fullName.isEmpty ? '?' : user.fullName[0].toUpperCase();
-
-    final avatar = CircleAvatar(
-      radius: 22,
-      backgroundColor: _getRankColor(rank).withValues(alpha: 0.1),
-      backgroundImage: hasAvatar ? NetworkImage(user.avatarUrl!) : null,
-      child: hasAvatar ? null : Text(initial, style: TextStyle(color: _getRankColor(rank), fontWeight: FontWeight.bold, fontSize: 18)),
-    );
-
+  Widget _entryCard(BuildContext context, LeaderboardEntry entry, {required bool isMe}) {
+    final rank = entry.rank;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topColor = _rankColor(rank);
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: isMe ? (isDark ? const Color(0xFF1F2E4A) : const Color(0xFFF0F5FF)) : Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: rank <= 3 ? Border.all(color: _getRankColor(rank), width: 2.0) : null,
-        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+        border: rank <= 3
+            ? Border.all(color: topColor, width: 2)
+            : (isMe ? Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)) : null),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 30,
+            width: 34,
             child: rank <= 3
-                ? Icon(Icons.emoji_events, color: _getRankColor(rank), size: 28)
-                : Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 16)),
-          ),
-          const SizedBox(width: 15),
-          // Viền đang trang bị (ARGB) của người chơi
-          border.isEmpty
-              ? avatar
-              : Container(
-                  padding: const EdgeInsets.all(2.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: border.length == 1 ? [border.first, border.first] : border),
-                  ),
-                  child: avatar,
-                ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ? Icon(Icons.emoji_events, color: topColor, size: 28)
+                : Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 15)),
           ),
           const SizedBox(width: 10),
+          // Viền đang trang bị của người chơi; ảnh được cắt tròn bên trong viền nên không bị tràn
+          UserAvatar(
+            size: 50,
+            ringWidth: 3,
+            borderColors: borderColorsOf(entry.equippedBorderColors),
+            imageUrl: entry.avatarUrl,
+            initials: initialsOf(entry.fullName),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isMe ? '${entry.fullName} (${tr('Bạn')})' : entry.fullName,
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 3),
+                Text(
+                  entry.slogan.isEmpty ? tr('Chưa có câu châm ngôn') : entry.slogan,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: AppTheme.greyColor,
+                      fontSize: 12,
+                      // Chỉ in nghiêng slogan thật, câu mặc định thì chữ thường
+                      fontStyle: entry.slogan.isNotEmpty ? FontStyle.italic : FontStyle.normal),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${user.score}',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600),
-              ),
-              Text(isXp ? 'Point' : 'Ngày', style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text('${entry.score}',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
+              Text(_unit, style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 
-  Color _getRankColor(int rank) {
+  Color _rankColor(int rank) {
     if (rank == 1) return const Color(0xFFFFD700);
     if (rank == 2) return const Color(0xFF94A3B8); // Màu bạc xám xanh nổi bật
     if (rank == 3) return const Color(0xFFCD7F32);

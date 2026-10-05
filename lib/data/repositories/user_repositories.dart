@@ -3,6 +3,8 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../../core/clock.dart';
 import '../../core/ids.dart';
+import '../../core/l10n.dart';
+import '../../core/speech.dart';
 import '../../core/theme.dart';
 import '../../models/_json.dart';
 import '../../models/leaderboard_model.dart';
@@ -148,9 +150,19 @@ class SettingsRepository extends WriteRepository {
   final SecureStore _store;
 
   Future<void> setNotification(bool v) => _change(() => prefs.setNotificationEnabled(v));
-  Future<void> setSound(bool v) => _change(() => prefs.setSoundEnabled(v));
+  Future<void> setSound(bool v) {
+    SpeechService.soundEnabled = v;
+    if (!v) SpeechService.stop();
+    return _change(() => prefs.setSoundEnabled(v));
+  }
+
   Future<void> setVibration(bool v) => _change(() => prefs.setVibrationEnabled(v));
-  Future<void> setLanguage(String v) => _change(() => prefs.setAppLanguage(v));
+
+  /// Đổi ngôn ngữ giao diện ngay lập tức (FlashApp dựng lại cây widget), lưu trên máy và đồng bộ lên server.
+  Future<void> setLanguage(String v) {
+    AppLocale.apply(v);
+    return _change(() => prefs.setAppLanguage(v));
+  }
   Future<void> setReminderTime(String hhmm) => _change(() => prefs.setDailyReminderTime(hhmm));
   Future<void> setDailyGoal(int lessons) => _change(() => prefs.setDailyGoalLessons(lessons));
 
@@ -162,13 +174,19 @@ class SettingsRepository extends WriteRepository {
   /// `UserSettingsResponse` từ server (pull hoặc kết quả SETTINGS_UPDATE).
   Future<void> applyServer(Map<String, dynamic> s) async {
     if (s['isNotificationEnabled'] is bool) await prefs.setNotificationEnabled(s['isNotificationEnabled'] as bool);
-    if (s['isSoundEnabled'] is bool) await prefs.setSoundEnabled(s['isSoundEnabled'] as bool);
+    if (s['isSoundEnabled'] is bool) {
+      await prefs.setSoundEnabled(s['isSoundEnabled'] as bool);
+      SpeechService.soundEnabled = prefs.isSoundEnabled;
+    }
     if (s['isVibrationEnabled'] is bool) await prefs.setVibrationEnabled(s['isVibrationEnabled'] as bool);
     if (s['isDarkMode'] is bool) {
       await prefs.setDarkMode(s['isDarkMode'] as bool);
       themeNotifier.value = prefs.isDarkMode ? ThemeMode.dark : ThemeMode.light;
     }
-    if (s['appLanguage'] is String) await prefs.setAppLanguage(s['appLanguage'] as String);
+    if (s['appLanguage'] is String) {
+      await prefs.setAppLanguage(s['appLanguage'] as String);
+      AppLocale.apply(prefs.appLanguage);
+    }
     if (s['dailyReminderTime'] is String) {
       final t = s['dailyReminderTime'] as String;
       await prefs.setDailyReminderTime(t.length >= 5 ? t.substring(0, 5) : t);
@@ -176,11 +194,18 @@ class SettingsRepository extends WriteRepository {
     if (s['dailyGoalLessons'] is num) await prefs.setDailyGoalLessons((s['dailyGoalLessons'] as num).toInt());
   }
 
+  /// Gửi OTP xác nhận đổi mật khẩu tới email của tài khoản (chỉ online).
+  Future<void> requestChangePasswordOtp() => _userApi.requestChangePasswordOtp();
+
+  /// `hasPassword` của tài khoản (Google-only thì không cần mật khẩu cũ). Lỗi mạng ném [NetworkException].
+  Future<bool> hasPassword() async => jBool((await _userApi.me())['hasPassword'], true);
+
   /// Trả cặp token mới; lưu ngay (mọi refresh token cũ đã bị thu hồi).
-  Future<void> changePassword({String? currentPassword, required String newPassword}) async {
+  Future<void> changePassword({String? currentPassword, required String newPassword, String? otp}) async {
     final auth = await _userApi.changePassword(
       currentPassword: currentPassword,
       newPassword: newPassword,
+      otp: otp,
       deviceId: await _store.deviceId(),
     );
     await _store.saveTokens(

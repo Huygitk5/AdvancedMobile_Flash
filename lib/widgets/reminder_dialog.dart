@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/clock.dart';
+import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../data/local/converters.dart';
 import '../data/storage/app_prefs.dart';
@@ -36,12 +37,12 @@ class ReminderDialog {
                 child: const Icon(Icons.notifications_active, color: AppTheme.primaryColor, size: 40),
               ),
               const SizedBox(height: 20),
-              const Text('Nhắc nhở học tập', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(tr('Nhắc nhở học tập'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              const Text(
-                'Hôm nay bạn đã học chưa?\nĐừng quên hoàn thành bài học\nđể duy trì streak nhé!',
+              Text(
+                tr('Hôm nay bạn đã học chưa?\nĐừng quên hoàn thành bài học\nđể duy trì streak nhé!'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.5),
+                style: const TextStyle(color: AppTheme.greyColor, fontSize: 14, height: 1.5),
               ),
               const SizedBox(height: 25),
               SizedBox(
@@ -56,13 +57,13 @@ class ReminderDialog {
                     Navigator.pop(context);
                     onStart?.call();
                   },
-                  child: Text('Bắt đầu học', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
+                  child: Text(tr('Bắt đầu học'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor)),
                 ),
               ),
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Để sau', style: TextStyle(color: AppTheme.primaryColor, fontSize: 15, fontWeight: FontWeight.bold)),
+                child: Text(tr('Để sau'), style: const TextStyle(color: AppTheme.primaryColor, fontSize: 15, fontWeight: FontWeight.bold)),
               )
             ],
           ),

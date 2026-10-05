@@ -1,6 +1,7 @@
 package com.flash.user.repository;
 
 import com.flash.user.entity.User;
+import com.flash.user.entity.UserRole;
 import com.flash.user.entity.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +33,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("select u from User u where u.deletedAt is null "
             + "and (:status is null or u.status = :status) "
+            + "and (:role is null or u.role = :role) "
             + "and (:keyword is null or lower(u.email) like lower(concat('%', :keyword, '%')) "
             + "     or lower(u.fullName) like lower(concat('%', :keyword, '%')))")
-    Page<User> search(@Param("keyword") String keyword, @Param("status") UserStatus status, Pageable pageable);
+    Page<User> search(@Param("keyword") String keyword, @Param("status") UserStatus status,
+                      @Param("role") UserRole role, Pageable pageable);
 }

@@ -19,6 +19,7 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true, // Heading của mọi màn hình căn giữa
         iconTheme: IconThemeData(color: textColor),
         titleTextStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
       ),
@@ -40,6 +41,7 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1E293B),
         elevation: 0,
+        centerTitle: true, // Heading của mọi màn hình căn giữa
         iconTheme: IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
       ),

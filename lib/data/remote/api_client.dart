@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../../core/env.dart';
+import '../../core/config.dart';
 import '../storage/app_prefs.dart';
 import '../storage/secure_store.dart';
 import 'api_exception.dart';
@@ -58,8 +58,14 @@ class ApiClient {
   final Dio dio;
   final Dio _refreshDio;
 
+  /// Người dùng đổi địa chỉ máy chủ (ServerSettingsDialog): áp ngay cho mọi request sau.
+  void setBaseUrl(String url) {
+    dio.options.baseUrl = url;
+    _refreshDio.options.baseUrl = url;
+  }
+
   static BaseOptions _options(String? baseUrl) => BaseOptions(
-        baseUrl: baseUrl ?? Env.apiBaseUrl,
+        baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         sendTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),

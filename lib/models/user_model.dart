@@ -30,6 +30,13 @@ class UserModel {
   final List<int> equippedBorderColors;
   final String? equippedAvatarUrl;
 
+  // --- chỉ có khi dựng từ API (`UserResponse`) ---
+  final bool emailVerified;
+
+  /// false với tài khoản chỉ đăng nhập Google.
+  final bool hasPassword;
+  final DateTime? createdAt;
+
   const UserModel({
     required this.id,
     required this.fullName,
@@ -50,6 +57,9 @@ class UserModel {
     this.status = 'ACTIVE',
     this.equippedBorderColors = const [],
     this.equippedAvatarUrl,
+    this.emailVerified = false,
+    this.hasPassword = true,
+    this.createdAt,
   });
 
   /// XP hiển thị = số server đã xác nhận + phần đang chờ đồng bộ.
@@ -74,5 +84,8 @@ class UserModel {
         version: jInt(j['version']),
         role: jStr(j['role'], 'USER'),
         status: jStr(j['status'], 'ACTIVE'),
+        emailVerified: jBool(j['emailVerified']),
+        hasPassword: jBool(j['hasPassword'], true),
+        createdAt: jDate(j['createdAt']),
       );
 }

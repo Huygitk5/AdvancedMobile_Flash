@@ -21,6 +21,7 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Token không hợp lệ"),
     // 403
     FORBIDDEN(HttpStatus.FORBIDDEN, "Không có quyền truy cập"),
+    EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Email chưa được xác thực, vui lòng nhập mã OTP đã gửi tới email"),
     RANK_REQUIREMENT_NOT_MET(HttpStatus.FORBIDDEN, "Chưa đạt thứ hạng yêu cầu"),
     // 404
     NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy dữ liệu"),

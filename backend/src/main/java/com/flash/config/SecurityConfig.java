@@ -10,6 +10,7 @@ import com.flash.security.RestAuthenticationEntryPoint;
 import com.flash.security.SyncRateLimitFilter;
 import com.flash.sync.SyncProperties;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -19,6 +20,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Stateless REST security với JWT Bearer.
@@ -67,6 +74,24 @@ public class SecurityConfig {
                 .addFilterAfter(new SyncRateLimitFilter(syncProperties.getRateLimitPerMinute(), objectMapper),
                         JwtAuthFilter.class);
         return http.build();
+    }
+
+    /**
+     * CORS cho app Flutter Web và Swagger UI. API dùng Bearer token (không cookie) nên cho phép mọi origin là an toàn;
+     * production có thể giới hạn bằng CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins:*}") String allowedOrigins) {
+        List<String> origins = Arrays.asList(allowedOrigins.trim().split("\\s*,\\s*"));
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(origins);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Accept-Language"));
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     @Bean

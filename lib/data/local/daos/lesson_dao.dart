@@ -48,4 +48,25 @@ class LessonDao extends BaseDao {
         [fromMs, toMs],
       ).getSingle())
           .i('c');
+
+  /// Đã có lần hoàn thành của bài này (topic hoặc chủ điểm ngữ pháp) chưa; [fromMs]/[toMs] giới hạn khoảng thời gian.
+  Future<bool> existsFor({String? topicId, String? grammarLessonId, int? fromMs, int? toMs}) async {
+    final where = topicId != null ? 'topic_id = ?' : 'grammar_lesson_id = ?';
+    final args = <Object?>[topicId ?? grammarLessonId];
+    var range = '';
+    if (fromMs != null && toMs != null) {
+      range = ' AND completed_at >= ? AND completed_at < ?';
+      args..add(fromMs)..add(toMs);
+    }
+    final r = await select('SELECT COUNT(*) AS c FROM $_t WHERE $where$range', args).getSingle();
+    return r.i('c') > 0;
+  }
+
+  /// "3/5 bài" hôm nay: số bài KHÁC NHAU đã hoàn thành trong [fromMs, toMs) (giống todayLessons của server).
+  Stream<int> watchDistinctBetween(int fromMs, int toMs) => select(
+        'SELECT COUNT(DISTINCT COALESCE(topic_id, grammar_lesson_id)) AS c FROM $_t '
+        'WHERE completed_at >= ? AND completed_at < ?',
+        [fromMs, toMs],
+        const [_t],
+      ).watchSingle().map((r) => r.i('c'));
 }

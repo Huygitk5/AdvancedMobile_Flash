@@ -10,7 +10,7 @@ class XpEstimator {
   /// Thẻ chuyển sang "đã thuộc" lần đầu.
   static const learnedXp = 5;
 
-  /// Chỉ 20 bài đầu tiên mỗi ngày được tính XP.
+  /// Chỉ 20 bài đầu tiên mỗi ngày được tính XP; học lại cùng một bài trong ngày không được cộng lần nữa.
   static const lessonXp = 10;
   static const lessonDailyXpLimit = 20;
 
@@ -30,9 +30,10 @@ class XpEstimator {
     return xp;
   }
 
-  /// [lessonsBeforeToday] = số bài đã hoàn thành hôm nay TRƯỚC bài này.
-  static int lesson({required int lessonsBeforeToday}) =>
-      lessonsBeforeToday < lessonDailyXpLimit ? lessonXp : 0;
+  /// [lessonsBeforeToday] = số bài đã hoàn thành hôm nay TRƯỚC bài này;
+  /// [sameLessonToday] = bài này (cùng topic / chủ điểm) đã hoàn thành trước đó trong hôm nay.
+  static int lesson({required int lessonsBeforeToday, bool sameLessonToday = false}) =>
+      !sameLessonToday && lessonsBeforeToday < lessonDailyXpLimit ? lessonXp : 0;
 
   static int quiz({required int correct, required int total, required bool firstAttemptToday}) {
     if (!firstAttemptToday) return 0;

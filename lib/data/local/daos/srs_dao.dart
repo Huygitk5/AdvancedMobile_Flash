@@ -63,7 +63,7 @@ class SrsDao extends BaseDao {
     return rows.isEmpty ? null : (box: rows.first.i('box'), isLearned: rows.first.b('is_learned'));
   }
 
-  /// Thẻ này đã từng "thuộc" (box_after >= 3) ở một log nào chưa: +5 XP chỉ cho lần đầu.
+  /// Thẻ này đã từng "thuộc" (box_after >= Srs.learnedBox) ở một log nào chưa: +5 XP chỉ cho lần đầu.
   Future<bool> everLearned(String cardId, {String? excludeLogId}) async {
     final r = await select(
       'SELECT COUNT(*) AS c FROM $_logs WHERE flashcard_id = ? AND box_after >= ? AND id <> ?',

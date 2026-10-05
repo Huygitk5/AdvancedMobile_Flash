@@ -79,12 +79,12 @@ class SyncIntegrationTest extends IntegrationTestBase {
         JsonNode first = push(token, now, ops);
         JsonNode results = first.get("results");
         assertThat(statuses(results)).containsExactly("APPLIED", "CONFLICT_SERVER_WINS", "REJECTED");
-        assertThat(results.at("/0/data/xpAwarded").asInt()).isEqualTo(2);
+        assertThat(results.at("/0/data/xpAwarded").asInt()).isEqualTo(7);
         assertThat(results.at("/0/data/progress/box").asInt()).isEqualTo(1);
         assertThat(results.at("/1/data/note/content").asText()).isEqualTo("bản từ máy tính bảng");
         assertThat(results.at("/2/errorCode").asText()).isEqualTo("QUEST_NOT_COMPLETED");
         assertThat(results.at("/2/message").asText()).isEqualTo("Tiến độ 1/20");
-        assertThat(first.at("/user/currentXp").asInt()).isEqualTo(2);
+        assertThat(first.at("/user/currentXp").asInt()).isEqualTo(7);
         assertThat(first.at("/user/streakDays").asInt()).isEqualTo(1);
 
         // Mất mạng trước khi nhận response => gửi lại nguyên lô
@@ -93,12 +93,12 @@ class SyncIntegrationTest extends IntegrationTestBase {
         assertThat(retry.at("/results/0/data/progress/box").asInt()).isEqualTo(1);
         assertThat(retry.at("/results/1/data/resolution").asText()).isEqualTo("CONFLICT_SERVER_WINS");
         assertThat(retry.at("/results/2/errorCode").asText()).isEqualTo("QUEST_NOT_COMPLETED");
-        assertThat(retry.at("/user/currentXp").asInt()).isEqualTo(2);
+        assertThat(retry.at("/user/currentXp").asInt()).isEqualTo(7);
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flashcard_review_logs WHERE user_id = ?", Integer.class, userId))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM xp_transactions WHERE user_id = ?",
-                Integer.class, userId)).isEqualTo(2);
+                Integer.class, userId)).isEqualTo(7);
         assertThat(jdbc.queryForList("SELECT status FROM sync_operations WHERE user_id = ? ORDER BY status",
                 String.class, userId)).containsExactly("APPLIED", "APPLIED", "REJECTED");
     }
@@ -218,7 +218,7 @@ class SyncIntegrationTest extends IntegrationTestBase {
         assertThat(changes.at("/userTopicProgress/0/topicId").asText()).isEqualTo(DAILY_LIFE);
         assertThat(changes.get("userQuests")).isNotEmpty();
         assertThat(changes.get("dailyStatistics")).hasSize(1);
-        assertThat(changes.at("/user/currentXp").asInt()).isEqualTo(2);
+        assertThat(changes.at("/user/currentXp").asInt()).isEqualTo(7);
         assertThat(changes.at("/settings/appLanguage").asText()).isEqualTo("vi");
 
         // Cursor lùi 2 giây so với lúc truy vấn

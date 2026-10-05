@@ -76,6 +76,32 @@ class ContentDao extends BaseDao {
         const ['flashcards', 'user_flashcard_progress', 'user_flashcard_notes', 'user_bookmarks'],
       ).watch().map((rows) => rows.map(_card).toList());
 
+  static const _cardTables = ['flashcards', 'user_flashcard_progress', 'user_flashcard_notes', 'user_bookmarks'];
+  static const _cardSelect =
+      'SELECT f.*, p.box, p.is_learned, p.due_at, n.id AS note_id, n.content AS note, n.version AS note_version, '
+      'CASE WHEN b.flashcard_id IS NOT NULL AND b.deleted_at IS NULL THEN 1 ELSE 0 END AS is_bookmarked '
+      'FROM flashcards f '
+      'LEFT JOIN user_flashcard_progress p ON p.flashcard_id = f.id '
+      'LEFT JOIN user_flashcard_notes n ON n.flashcard_id = f.id AND n.deleted_at IS NULL '
+      'LEFT JOIN user_bookmarks b ON b.flashcard_id = f.id ';
+
+  /// Từ đã lưu (bookmark), lưu gần nhất trước.
+  Stream<List<Flashcard>> watchBookmarkedCards() => select(
+        '${_cardSelect}WHERE b.flashcard_id IS NOT NULL AND b.deleted_at IS NULL ORDER BY b.created_at DESC',
+        const [],
+        _cardTables,
+      ).watch().map((rows) => rows.map(_card).toList());
+
+  /// Tìm từ vựng theo từ khoá (khớp từ hoặc nghĩa), tối đa [limit] kết quả.
+  Stream<List<Flashcard>> watchSearchCards(String keyword, {int limit = 10}) {
+    final like = '%${_escapeLike(keyword.trim())}%';
+    return select(
+      "${_cardSelect}WHERE f.word LIKE ? ESCAPE '\\' OR f.meaning LIKE ? ESCAPE '\\' ORDER BY f.word LIMIT ?",
+      [like, like, limit],
+      _cardTables,
+    ).watch().map((rows) => rows.map(_card).toList());
+  }
+
   Future<Flashcard?> card(String id) async {
     final rows = await select('SELECT * FROM flashcards WHERE id = ?', [id]).get();
     return rows.isEmpty ? null : _card(rows.first);
@@ -122,6 +148,14 @@ class ContentDao extends BaseDao {
         [topicId],
         const ['quizzes', 'quiz_questions'],
       ).watch().map((rows) => rows.isEmpty ? null : _quiz(rows.first));
+
+  /// Mọi bài kiểm tra của một topic (màn Hoàn thành mời làm từng bài).
+  Stream<List<Quiz>> watchQuizzesForTopic(String topicId) => select(
+        'SELECT q.*, (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = q.id) AS question_count '
+        'FROM quizzes q WHERE q.topic_id = ? ORDER BY q.title',
+        [topicId],
+        const ['quizzes', 'quiz_questions'],
+      ).watch().map((rows) => rows.map(_quiz).toList());
 
   Future<Quiz?> quiz(String quizId) async {
     final rows = await select(

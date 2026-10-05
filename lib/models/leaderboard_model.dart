@@ -5,6 +5,7 @@ class LeaderboardEntry {
   final String userId;
   final String fullName;
   final String? avatarUrl;
+  final String slogan;
 
   /// ARGB, rỗng = không trang bị viền.
   final List<int> equippedBorderColors;
@@ -15,6 +16,7 @@ class LeaderboardEntry {
     required this.userId,
     required this.fullName,
     this.avatarUrl,
+    this.slogan = '',
     this.equippedBorderColors = const [],
     required this.score,
   });
@@ -24,6 +26,7 @@ class LeaderboardEntry {
         userId: jStr(j['userId']),
         fullName: jStr(j['fullName']),
         avatarUrl: j['avatarUrl'] as String?,
+        slogan: jStr(j['slogan']),
         equippedBorderColors: jIntList(j['equippedBorderColors']),
         score: jInt(j['score']),
       );

@@ -7,6 +7,7 @@ import com.flash.security.UserPrincipal;
 import com.flash.user.dto.AdminCreateUserRequest;
 import com.flash.user.dto.AdminUpdateUserRequest;
 import com.flash.user.dto.UserResponse;
+import com.flash.user.entity.UserRole;
 import com.flash.user.entity.UserStatus;
 import com.flash.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,14 +44,16 @@ public class AdminUserController {
 
     private final UserService userService;
 
-    @Operation(summary = "Danh sách user (tìm theo email/tên, lọc trạng thái)")
+    @Operation(summary = "Danh sách user (tìm theo email/tên, lọc trạng thái và quyền)",
+            description = "role=USER để chỉ lấy học viên, role=ADMIN để chỉ lấy quản trị viên")
     @GetMapping
     public ApiResponse<PageResponse<UserResponse>> list(@RequestParam(required = false) String keyword,
                                                         @RequestParam(required = false) UserStatus status,
+                                                        @RequestParam(required = false) UserRole role,
                                                         @RequestParam(defaultValue = "0") @Min(0) int page,
                                                         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.ok(PageResponse.of(userService.search(keyword, status, pageable)));
+        return ApiResponse.ok(PageResponse.of(userService.search(keyword, status, role, pageable)));
     }
 
     @Operation(summary = "Tạo user")

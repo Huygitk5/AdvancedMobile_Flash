@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../core/l10n.dart';
+
 class FieldErrorDto {
   const FieldErrorDto(this.field, this.message);
 
@@ -31,15 +33,15 @@ class ApiException implements Exception {
   bool get isVersionConflict => status == 409 && code == 'VERSION_CONFLICT';
   bool get isUnauthorized => status == 401;
 
-  /// Câu tiếng Việt hiển thị cho người dùng.
+  /// Câu hiển thị cho người dùng (theo ngôn ngữ giao diện).
   String get userMessage {
     if (code == 'VALIDATION_ERROR' && errors.isNotEmpty) {
       return errors.map((e) => e.message).join('\n');
     }
-    if (_messages.containsKey(code)) return _messages[code]!;
+    if (_messages.containsKey(code)) return tr(_messages[code]!);
     if (message.isNotEmpty) return message;
-    if (status >= 500) return _messages['INTERNAL_ERROR']!;
-    return 'Đã có lỗi xảy ra, vui lòng thử lại.';
+    if (status >= 500) return tr(_messages['INTERNAL_ERROR']!);
+    return tr('Đã có lỗi xảy ra, vui lòng thử lại.');
   }
 
   @override
@@ -49,6 +51,7 @@ class ApiException implements Exception {
     'INVALID_CREDENTIALS': 'Email hoặc mật khẩu không đúng.',
     'ACCOUNT_LOCKED': 'Tài khoản của bạn đã bị khoá.',
     'EMAIL_ALREADY_EXISTS': 'Email này đã được đăng ký.',
+    'EMAIL_NOT_VERIFIED': 'Email chưa được xác thực.',
     'INVALID_OTP': 'Mã OTP không đúng hoặc đã hết hạn.',
     'WRONG_PASSWORD': 'Mật khẩu hiện tại không đúng.',
     'INSUFFICIENT_XP': 'Bạn không đủ XP.',
@@ -73,7 +76,7 @@ class NetworkException implements Exception {
 
   final DioException? cause;
 
-  String get userMessage => 'Không có kết nối mạng. Vui lòng kiểm tra lại.';
+  String get userMessage => tr('Không kết nối được máy chủ. Hãy kiểm tra mạng và địa chỉ máy chủ.');
 
   @override
   String toString() => 'NetworkException(${cause?.type})';
