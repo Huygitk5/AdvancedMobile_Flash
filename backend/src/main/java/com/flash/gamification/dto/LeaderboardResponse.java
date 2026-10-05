@@ -24,6 +24,7 @@ public class LeaderboardResponse {
         private final UUID userId;
         private final String fullName;
         private final String avatarUrl;
+        private final String slogan;
         private final List<Long> equippedBorderColors;
         private final long score;
     }

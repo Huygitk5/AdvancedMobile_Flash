@@ -46,7 +46,8 @@ import java.util.stream.Collectors;
 public class SrsService {
 
     static final int MAX_BOX = 5;
-    static final int LEARNED_BOX = 3;
+    /** Một từ được tính là "đã học" ngay từ lần Know đầu tiên; Again kéo về box 0 thì mất trạng thái. */
+    static final int LEARNED_BOX = 1;
     static final int AGAIN_BOX_DROP = 2;
     static final Duration AGAIN_DELAY = Duration.ofMinutes(10);
     /** Khoảng ôn lại theo box 0..5: ngay, 1, 3, 7, 14, 30 ngày. */
@@ -115,7 +116,8 @@ public class SrsService {
             LocalDate day = Zones.localDate(user, reviewedAt);
             activityRecorder.record(user, reviewedAt, stat -> {
                 stat.setCardsReviewed(stat.getCardsReviewed() + 1);
-                if (becameLearned) {
+                // Chỉ tính "từ mới học" ở lần Know đầu tiên của thẻ; Know -> Again -> Know không đếm lại
+                if (becameLearned && progress.getKnowCount() == 1) {
                     stat.setWordsLearned(stat.getWordsLearned() + 1);
                 }
             });

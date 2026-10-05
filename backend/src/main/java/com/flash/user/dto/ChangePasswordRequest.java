@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 @Getter
@@ -18,6 +19,10 @@ public class ChangePasswordRequest {
     @NotBlank
     @Size(min = 8, max = 72)
     private String newPassword;
+
+    /** Mã OTP gửi tới email qua POST /v1/users/change-password/otp; bắt buộc khi bật xác thực email. */
+    @Pattern(regexp = "\\d{6}", message = "OTP gồm 6 chữ số")
+    private String otp;
 
     @Size(max = 100)
     private String deviceId;

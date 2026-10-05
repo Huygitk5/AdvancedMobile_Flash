@@ -86,6 +86,7 @@ CREATE TABLE refresh_tokens (
 CREATE TABLE password_reset_tokens (
   id             CHAR(36)    NOT NULL,
   user_id        CHAR(36)    NOT NULL,
+  purpose        ENUM('PASSWORD_RESET','EMAIL_VERIFY','CHANGE_PASSWORD') NOT NULL DEFAULT 'PASSWORD_RESET',
   token_hash     CHAR(64)    NOT NULL COMMENT 'SHA-256 của OTP/token gửi qua email',
   expires_at     DATETIME(3) NOT NULL,
   used_at        DATETIME(3) NULL,
@@ -93,7 +94,7 @@ CREATE TABLE password_reset_tokens (
   created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uk_prt_hash (token_hash),
-  KEY idx_prt_user (user_id, expires_at),
+  KEY idx_prt_user_purpose (user_id, purpose, expires_at),
   CONSTRAINT fk_prt_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -603,16 +604,18 @@ CREATE OR REPLACE VIEW v_leaderboard_xp AS
 SELECT u.id                AS user_id,
        u.full_name,
        u.avatar_url,
+       u.slogan,
        u.total_lifetime_xp AS score,
        RANK() OVER (ORDER BY u.total_lifetime_xp DESC) AS rank_no
 FROM users u
-WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL;
+WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.role = 'USER';
 
 CREATE OR REPLACE VIEW v_leaderboard_streak AS
 SELECT u.id             AS user_id,
        u.full_name,
        u.avatar_url,
+       u.slogan,
        u.longest_streak AS score,
        RANK() OVER (ORDER BY u.longest_streak DESC) AS rank_no
 FROM users u
-WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL;
+WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.role = 'USER';

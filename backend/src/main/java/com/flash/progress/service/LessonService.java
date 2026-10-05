@@ -63,6 +63,11 @@ public class LessonService {
         Instant completedAt = request.getCompletedAt();
         int duration = request.getDurationSeconds() != null ? request.getDurationSeconds() : 0;
 
+        // "Bài học hoàn thành" đếm số bài khác nhau: học lại một bài đã xong thì chỉ ghi nhận lượt học, không cộng thêm
+        boolean firstCompletionOfLesson = request.getLessonType() == LessonType.TOPIC
+                ? !repository.existsByUserIdAndTopicId(userId, request.getTopicId())
+                : !repository.existsByUserIdAndGrammarLessonId(userId, request.getGrammarLessonId());
+
         LessonCompletion completion = new LessonCompletion();
         completion.setId(request.getId());
         completion.setUserId(userId);
@@ -73,7 +78,9 @@ public class LessonService {
         completion.setDurationSeconds(duration);
         completion.setCompletedAt(completedAt);
         repository.save(completion);
-        user.setCompletedLessons(user.getCompletedLessons() + 1);
+        if (firstCompletionOfLesson) {
+            user.setCompletedLessons(user.getCompletedLessons() + 1);
+        }
 
         Instant studiedAt = completedAt.isBefore(now) ? completedAt : now;
         if (request.getLessonType() == LessonType.TOPIC) {
@@ -90,8 +97,9 @@ public class LessonService {
                 s.setStudySeconds(s.getStudySeconds() + duration);
             });
             if (stat.getLessonsCompleted() <= XpRules.LESSON_DAILY_XP_LIMIT) {
+                // source_id theo (bài, ngày): học lại cùng một bài trong ngày không được cộng XP lần nữa
                 xpAwarded = xpService.award(user, XpRules.LESSON_XP, XpSourceType.LESSON_COMPLETE,
-                        completion.getId().toString(), day);
+                        "lesson:" + lessonTargetId(request) + ":" + day, day);
             }
             questService.onEvent(user, QuestType.COMPLETE_LESSON, 1, completedAt);
             questService.onEvent(user, QuestType.STUDY_MINUTES, duration / 60, completedAt);
@@ -103,12 +111,18 @@ public class LessonService {
     @Transactional(readOnly = true)
     public HomeSummaryResponse.TodayLessons todayLessons(User user) {
         LocalDate today = Zones.today(user);
-        long done = repository.countByUserIdAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(user.getId(),
-                Zones.startOfDay(user, today), Zones.startOfDay(user, today.plusDays(1)));
+        Instant from = Zones.startOfDay(user, today);
+        Instant to = Zones.startOfDay(user, today.plusDays(1));
+        long done = repository.countDistinctTopics(user.getId(), from, to)
+                + repository.countDistinctGrammarLessons(user.getId(), from, to);
         int goal = settingsRepository.findById(user.getId())
                 .map(UserSettings::getDailyGoalLessons)
                 .orElse(DEFAULT_DAILY_GOAL);
         return new HomeSummaryResponse.TodayLessons((int) done, goal);
+    }
+
+    private static UUID lessonTargetId(LessonCompleteRequest request) {
+        return request.getLessonType() == LessonType.TOPIC ? request.getTopicId() : request.getGrammarLessonId();
     }
 
     /** MySQL không CHECK được "đúng 1 trong 2 FK", nên kiểm ở đây. */

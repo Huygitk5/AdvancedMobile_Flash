@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -62,8 +63,16 @@ public class UserController {
         return ApiResponse.ok(userService.updateProfile(me.getId(), request));
     }
 
+    @Operation(summary = "Gửi OTP xác nhận đổi mật khẩu tới email của user hiện tại")
+    @PostMapping("/change-password/otp")
+    public ApiResponse<Void> requestChangePasswordOtp(@CurrentUser UserPrincipal me) {
+        authService.requestChangePasswordOtp(me.getId());
+        return ApiResponse.ok(null, "Mã OTP đã được gửi tới email của bạn");
+    }
+
     @Operation(summary = "Đổi mật khẩu",
-            description = "Thu hồi mọi phiên đăng nhập khác, trả cặp token mới cho thiết bị hiện tại")
+            description = "Cần OTP từ POST /v1/users/change-password/otp khi bật xác thực email. "
+                    + "Thu hồi mọi phiên đăng nhập khác, trả cặp token mới cho thiết bị hiện tại")
     @PutMapping("/change-password")
     public ApiResponse<AuthResponse> changePassword(@CurrentUser UserPrincipal me,
                                                     @Valid @RequestBody ChangePasswordRequest request,

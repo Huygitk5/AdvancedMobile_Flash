@@ -15,8 +15,14 @@ public class AuthResponse {
     private final String refreshToken;
     private final String tokenType;
 
-    /** Số giây access token còn hiệu lực. */
-    private final long expiresIn;
+    /** Số giây access token còn hiệu lực; null khi chưa cấp token (verificationRequired). */
+    private final Long expiresIn;
 
     private final Instant refreshTokenExpiresAt;
+
+    /**
+     * true khi đăng ký xong nhưng email chưa xác thực: chưa có token, client chuyển sang
+     * màn nhập OTP (POST /v1/auth/verify-email).
+     */
+    private final boolean verificationRequired;
 }
