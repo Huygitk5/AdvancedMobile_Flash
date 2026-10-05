@@ -1,56 +1,26 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/icons.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/topic_model.dart';
+import '../../data/content_repository.dart';
+import '../../models/flashcard_model.dart';
 import '../../models/grammar_model.dart';
+import '../../models/topic_model.dart';
+import '../../widgets/common.dart';
 import '../flashcard/flashcard_screen.dart';
 import '../grammar/grammar_detail_screen.dart';
 
 class TopicScreen extends StatefulWidget {
   final int initialIndex;
 
-  const TopicScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+  const TopicScreen({super.key, this.initialIndex = 0});
 
   @override
   State<TopicScreen> createState() => _TopicScreenState();
 }
 
 class _TopicScreenState extends State<TopicScreen> {
-  // Các biến lưu trữ trạng thái tìm kiếm và bộ lọc
-  String searchQuery = '';
-  String selectedFilter = 'Tất cả';
-
-  // Hàm xử lý logic lọc Từ vựng
-  List<Topic> get filteredVocabulary {
-    return MockData.vocabularyTopics.where((topic) {
-      // 1. Lọc theo tên (Search)
-      bool matchSearch = topic.title.toLowerCase().contains(searchQuery.toLowerCase());
-
-      // 2. Lọc theo trạng thái (Filter Chips)
-      bool matchFilter = true;
-      if (selectedFilter == 'Đang học') {
-        matchFilter = topic.progress > 0 && topic.progress < 1.0;
-      } else if (selectedFilter == 'Đã hoàn thành') {
-        matchFilter = topic.progress >= 1.0;
-      }
-
-      return matchSearch && matchFilter;
-    }).toList();
-  }
-
-  List<Grammar> get filteredGrammar {
-    return MockData.grammarTopics.where((grammar) {
-      bool matchSearch = grammar.title.toLowerCase().contains(searchQuery.toLowerCase());
-      bool matchFilter = true;
-      if (selectedFilter == 'Đang học') {
-        matchFilter = grammar.progress > 0 && grammar.progress < 1.0;
-      } else if (selectedFilter == 'Hoàn thành') {
-        matchFilter = grammar.progress >= 1.0;
-      }
-      return matchSearch && matchFilter;
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -58,174 +28,254 @@ class _TopicScreenState extends State<TopicScreen> {
       initialIndex: widget.initialIndex,
       child: Scaffold(
         appBar: AppBar(
-          automaticallyImplyLeading: false, // Đã ẩn nút Back
+          automaticallyImplyLeading: false,
           elevation: 0,
-          title: Text('Học tập', style: TextStyle( fontWeight: FontWeight.bold)),
-          centerTitle: true,
-          bottom: const TabBar(
+          title: Text(tr('Học tập'), style: const TextStyle(fontWeight: FontWeight.bold)),
+          bottom: TabBar(
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: AppTheme.greyColor,
             indicatorColor: AppTheme.primaryColor,
             indicatorWeight: 3,
-            tabs: [
-              Tab(text: 'Từ vựng'),
-              Tab(text: 'Ngữ pháp'),
+            tabs: [Tab(text: tr('Từ vựng')), Tab(text: tr('Ngữ pháp'))],
+          ),
+        ),
+        body: const TabBarView(children: [_VocabularyTab(), _GrammarTab()]),
+      ),
+    );
+  }
+}
+
+/// Thanh tìm kiếm + bộ lọc dùng chung cho hai tab.
+class _SearchAndFilter extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final ProgressFilter filter;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<ProgressFilter> onFilter;
+
+  const _SearchAndFilter({
+    required this.controller,
+    required this.hint,
+    required this.filter,
+    required this.onChanged,
+    required this.onFilter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+          child: TextField(
+            controller: controller,
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              hintText: hint,
+              prefixIcon: const Icon(Icons.search, color: AppTheme.greyColor),
+              filled: true,
+              fillColor: Theme.of(context).cardColor,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Row(
+            children: [
+              _chip(context, tr('Tất cả'), ProgressFilter.all),
+              const SizedBox(width: 10),
+              _chip(context, tr('Đang học'), ProgressFilter.inProgress),
+              const SizedBox(width: 10),
+              _chip(context, tr('Đã hoàn thành'), ProgressFilter.completed),
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildVocabularyTab(context),
-            _buildGrammarTab(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVocabularyTab(BuildContext context) {
-    final list = filteredVocabulary; // Lấy danh sách đã được lọc
-
-    return Column(
-      children: [
-        _buildSearchBar('Tìm chủ đề, từ vựng...'),
-        _buildFilterChips(),
-        Expanded(
-          child: list.isEmpty
-              ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
-              : ListView.builder(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              return _buildVocabularyCard(context, list[index]);
-            },
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildGrammarTab(BuildContext context) {
-    final list = filteredGrammar; // Lấy danh sách đã được lọc
+  Widget _chip(BuildContext context, String label, ProgressFilter value) {
+    final active = filter == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () => onFilter(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? AppTheme.primaryColor : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: active ? null : Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+        ),
+        child: Text(label,
+            style: TextStyle(color: active ? Colors.white : AppTheme.greyColor, fontWeight: FontWeight.w500, fontSize: 13)),
+      ),
+    );
+  }
+}
 
+class _VocabularyTab extends StatefulWidget {
+  const _VocabularyTab();
+
+  @override
+  State<_VocabularyTab> createState() => _VocabularyTabState();
+}
+
+class _VocabularyTabState extends State<_VocabularyTab> with AutomaticKeepAliveClientMixin {
+  final _search = TextEditingController();
+  Timer? _debounce;
+  ProgressFilter _filter = ProgressFilter.all;
+  List<Topic> _topics = const [];
+  List<Flashcard> _words = const [];
+  bool _loading = true;
+  String? _error;
+  int _requestId = 0;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final id = ++_requestId;
+    final keyword = _search.text.trim();
+    setState(() {
+      _loading = _topics.isEmpty;
+      _error = null;
+    });
+    try {
+      final topics = await ContentRepository.allPages<Topic>(
+          (page) => ContentRepository.topics(status: _filter, keyword: keyword, page: page, size: 100));
+      // Tìm theo từ khoá thì tìm cả từ vựng khớp (từ hoặc nghĩa)
+      List<Flashcard> words = const [];
+      if (keyword.length >= 2 && _filter == ProgressFilter.all) {
+        words = (await ContentRepository.searchFlashcards(keyword, size: 10)).items;
+      }
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _topics = topics;
+        _words = words;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String _) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _load);
+  }
+
+  Future<void> _openTopic(String id, String title) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => FlashcardScreen(topicId: id, topicTitle: title)));
+    if (mounted) _load();
+  }
+
+  Future<void> _openWord(Flashcard word) async {
+    try {
+      final topic = await ContentRepository.topic(word.topicId);
+      if (mounted) await _openTopic(topic.id, topic.title);
+    } catch (e) {
+      if (mounted) showAppSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     return Column(
       children: [
-        _buildSearchBar('Tìm điểm ngữ pháp...'),
-        _buildFilterChips(),
-        Expanded(
-          child: list.isEmpty
-              ? const Center(child: Text('Không tìm thấy kết quả nào', style: TextStyle(color: AppTheme.greyColor)))
-              : ListView.builder(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),            itemCount: list.length,
-            itemBuilder: (context, index) {
-              return _buildGrammarCard(context, list[index]);
-            },
-          ),
+        _SearchAndFilter(
+          controller: _search,
+          hint: tr('Tìm chủ đề, từ vựng...'),
+          filter: _filter,
+          onChanged: _onSearchChanged,
+          onFilter: (f) {
+            setState(() => _filter = f);
+            _load();
+          },
         ),
+        Expanded(child: _body(context)),
       ],
     );
   }
 
-  // Cập nhật thanh tìm kiếm để nhận sự kiện gõ phím
-  Widget _buildSearchBar(String hint) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            searchQuery = value; // Cập nhật từ khóa tìm kiếm
-          });
-        },
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: Icon(Icons.search, color: AppTheme.greyColor),
-          filled: true,
-          fillColor: Theme.of(context).cardColor,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: Row(
+  Widget _body(BuildContext context) {
+    if (_loading) return const LoadingView();
+    if (_error != null) return ErrorView(message: _error!, onRetry: _load);
+    if (_topics.isEmpty && _words.isEmpty) return EmptyView(message: tr('Không tìm thấy kết quả nào'), icon: Icons.search_off);
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 10, 20, 100 + bottom),
         children: [
-          _buildChip('Tất cả'),
-          const SizedBox(width: 10),
-          _buildChip('Đang học'),
-          const SizedBox(width: 10),
-          _buildChip('Đã hoàn thành'),
+          for (final topic in _topics) _topicCard(context, topic),
+          if (_words.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(tr('Từ vựng tìm thấy'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 10),
+            for (final word in _words) _wordTile(context, word),
+          ],
         ],
       ),
     );
   }
 
-  // Cập nhật Nút bấm bộ lọc để nhận sự kiện click
-  Widget _buildChip(String label) {
-    bool isActive = selectedFilter == label;
-
+  Widget _topicCard(BuildContext context, Topic topic) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedFilter = label; // Cập nhật bộ lọc được chọn
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppTheme.primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: isActive ? null : Border.all(color: Colors.grey.shade300),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : AppTheme.greyColor,
-            fontWeight: FontWeight.w500,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVocabularyCard(BuildContext context, Topic topic) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => FlashcardScreen(topicTitle: topic.title)),
-        );
-      },
+      onTap: () => _openTopic(topic.id, topic.title),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.08), blurRadius: 5, offset: const Offset(0, 2))],
         ),
         child: Row(
           children: [
             Container(
-              width: 50, height: 50,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
-              child: Center(child: Text(topic.iconPath, style: TextStyle(fontSize: 24))),
+              child: Center(child: Text(topic.iconPath, style: const TextStyle(fontSize: 24))),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(topic.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(topic.title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      _levelBadge(topic.level),
+                    ],
+                  ),
                   const SizedBox(height: 5),
-                  Text('${topic.totalWords} từ', style: TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                  Text(trf('{n} từ', {'n': topic.totalWords}), style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -233,71 +283,225 @@ class _TopicScreenState extends State<TopicScreen> {
                         child: LinearProgressIndicator(
                           value: topic.progress,
                           backgroundColor: Colors.grey.shade200,
-                          color: AppTheme.primaryColor,
+                          color: topic.status == 'COMPLETED' ? Colors.green : AppTheme.primaryColor,
                           minHeight: 6,
                           borderRadius: BorderRadius.circular(5),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text('${(topic.progress * 100).toInt()}%', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                      Text('${(topic.progress * 100).round()}%', style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            Icon(Icons.chevron_right, color: AppTheme.greyColor),
+            const Icon(Icons.chevron_right, color: AppTheme.greyColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildGrammarCard(BuildContext context, Grammar grammar) {
-    double progress = grammar.progress;
-    Color iconBgColor = progress == 1.0 ? Colors.green.shade400 : (progress > 0 ? Colors.deepPurple.shade400 : Colors.blue.shade300);
-    Color statusColor = progress == 1.0 ? Colors.green : AppTheme.greyColor;
-
-    Widget trailingIcon = progress == 1.0
-        ? Icon(Icons.check_circle, color: Colors.green, size: 28)
-        : Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: progress > 0 ? Colors.blueAccent : Colors.grey.shade300, width: 2.5)));
-
-    // Map string từ API sang Icon Flutter
-    IconData getIcon(String name) {
-      switch (name) {
-        case 'access_alarm': return Icons.access_alarm;
-        case 'history_edu': return Icons.history_edu;
-        case 'verified_user': return Icons.verified_user_outlined;
-        case 'alt_route': return Icons.alt_route;
-        default: return Icons.account_tree_outlined;
-      }
-    }
-
+  Widget _wordTile(BuildContext context, Flashcard word) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => GrammarDetailScreen(title: grammar.title))),
+      onTap: () => _openWord(word),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${word.word}  ${word.pronunciation}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(word.meaning, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.greyColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _levelBadge(String level) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
+    child: Text(level, style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 11)),
+  );
+}
+
+class _GrammarTab extends StatefulWidget {
+  const _GrammarTab();
+
+  @override
+  State<_GrammarTab> createState() => _GrammarTabState();
+}
+
+class _GrammarTabState extends State<_GrammarTab> with AutomaticKeepAliveClientMixin {
+  final _search = TextEditingController();
+  Timer? _debounce;
+  ProgressFilter _filter = ProgressFilter.all;
+  List<Grammar> _lessons = const [];
+  bool _loading = true;
+  String? _error;
+  int _requestId = 0;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final id = ++_requestId;
+    setState(() {
+      _loading = _lessons.isEmpty;
+      _error = null;
+    });
+    try {
+      final lessons = await ContentRepository.allPages<Grammar>(
+          (page) => ContentRepository.grammarLessons(status: _filter, keyword: _search.text, page: page, size: 100));
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _lessons = lessons;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String _) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _load);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Column(
+      children: [
+        _SearchAndFilter(
+          controller: _search,
+          hint: tr('Tìm điểm ngữ pháp...'),
+          filter: _filter,
+          onChanged: _onSearchChanged,
+          onFilter: (f) {
+            setState(() => _filter = f);
+            _load();
+          },
+        ),
+        Expanded(child: _body(context)),
+      ],
+    );
+  }
+
+  Widget _body(BuildContext context) {
+    if (_loading) return const LoadingView();
+    if (_error != null) return ErrorView(message: _error!, onRetry: _load);
+    if (_lessons.isEmpty) return EmptyView(message: tr('Không tìm thấy kết quả nào'), icon: Icons.search_off);
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(20, 10, 20, 100 + bottom),
+        itemCount: _lessons.length,
+        itemBuilder: (context, i) => _grammarCard(context, _lessons[i]),
+      ),
+    );
+  }
+
+  String _statusText(Grammar g) {
+    final pct = (g.progress * 100).round();
+    switch (g.status) {
+      case 'COMPLETED':
+        return trf('Đã học {p}%', {'p': 100});
+      case 'IN_PROGRESS':
+        return trf('Đang học {p}%', {'p': pct});
+      default:
+        return trf('Chưa học {p}%', {'p': 0});
+    }
+  }
+
+  Widget _grammarCard(BuildContext context, Grammar grammar) {
+    final done = grammar.status == 'COMPLETED';
+    final started = grammar.status == 'IN_PROGRESS';
+    final iconBg = done ? Colors.green.shade400 : (started ? Colors.deepPurple.shade400 : Colors.blue.shade300);
+    final statusColor = done ? Colors.green : AppTheme.greyColor;
+    final trailing = done
+        ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
+        : Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+                shape: BoxShape.circle, border: Border.all(color: started ? Colors.blueAccent : Colors.grey.shade300, width: 2.5)),
+          );
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+            context, MaterialPageRoute(builder: (_) => GrammarDetailScreen(grammarId: grammar.id, title: grammar.title)));
+        if (mounted) _load();
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 5, offset: const Offset(0, 2))]),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.08), blurRadius: 5, offset: const Offset(0, 2))],
+        ),
         child: Row(
           children: [
             Container(
-              width: 50, height: 50, decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(getIcon(grammar.iconName), color: Theme.of(context).cardColor, size: 26),
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+              child: Icon(grammarIcon(grammar.iconName), color: Colors.white, size: 26),
             ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(grammar.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, )),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(grammar.title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      _levelBadge(grammar.level),
+                    ],
+                  ),
                   const SizedBox(height: 5),
-                  Text(grammar.status, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w500)),
+                  Text(_statusText(grammar), style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            trailingIcon,
+            trailing,
           ],
         ),
       ),

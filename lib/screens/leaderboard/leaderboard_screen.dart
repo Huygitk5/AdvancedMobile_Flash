@@ -1,31 +1,50 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/user_model.dart'; // Import UserModel chuẩn
+import '../../data/app_state.dart';
+import '../../data/game_repository.dart';
+import '../../models/leaderboard_model.dart';
+import '../../widgets/common.dart';
 
 class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({Key? key}) : super(key: key);
+  const LeaderboardScreen({super.key});
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  late List<UserModel> xpLeaderboard;
-  late List<UserModel> streakLeaderboard;
+  Leaderboard? _xp;
+  Leaderboard? _streak;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    // Lấy Top 10 Point
-    List<UserModel> xpList = List<UserModel>.from(MockData.users);
-    xpList.sort((a, b) => b.totalLifetimeXp.compareTo(a.totalLifetimeXp));
-    xpLeaderboard = xpList.take(10).toList();
+    _load();
+  }
 
-    // Lấy Top 10 Streak
-    List<UserModel> streakList = List<UserModel>.from(MockData.users);
-    streakList.sort((a, b) => b.longestStreak.compareTo(a.longestStreak));
-    streakLeaderboard = streakList.take(10).toList();
+  Future<void> _load() async {
+    setState(() {
+      _loading = _xp == null;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([GameRepository.leaderboard('xp'), GameRepository.leaderboard('streak')]);
+      if (!mounted) return;
+      setState(() {
+        _xp = results[0];
+        _streak = results[1];
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -35,93 +54,138 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       child: Scaffold(
         appBar: AppBar(
           elevation: 0,
-          leading: IconButton(icon: Icon(Icons.arrow_back_ios_new,  size: 20), onPressed: () => Navigator.pop(context)),
-          title: Text('Top 10 Vinh Danh', style: TextStyle( fontSize: 20, fontWeight: FontWeight.bold)),
-          centerTitle: true,
-          bottom: const TabBar(
+          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
+          title: Text(tr('Top 10 Vinh Danh'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          bottom: TabBar(
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: AppTheme.greyColor,
             indicatorColor: AppTheme.primaryColor,
             indicatorWeight: 3,
-            tabs: [Tab(text: 'Tổng Point (XP)'), Tab(text: 'Chuỗi Streak')],
+            tabs: [Tab(text: tr('Tổng Point (XP)')), Tab(text: tr('Chuỗi Streak'))],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildListView(xpLeaderboard, isXp: true),
-            _buildListView(streakLeaderboard, isXp: false),
-          ],
-        ),
+        body: _loading
+            ? const LoadingView()
+            : _error != null
+                ? ErrorView(message: _error!, onRetry: _load)
+                : TabBarView(children: [_buildList(_xp!, isXp: true), _buildList(_streak!, isXp: false)]),
       ),
     );
   }
 
-  Widget _buildListView(List<UserModel> users, {required bool isXp}) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final user = users[index];
-        final rank = index + 1;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 15),
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            border: rank <= 3 ? Border.all(color: _getRankColor(rank), width: 2.0) : null,
-            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 30,
-                child: rank <= 3
-                    ? Icon(Icons.emoji_events, color: _getRankColor(rank), size: 28)
-                    : Text('#$rank', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 16)),
-              ),
-              const SizedBox(width: 15),
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: _getRankColor(rank).withOpacity(0.1),
-                // Lấy chữ cái đầu của fullName
-                child: Text(user.fullName[0].toUpperCase(), style: TextStyle(color: _getRankColor(rank), fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Hiển thị fullName và slogan
-                    Text(user.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, ), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Text(user.slogan, style: TextStyle(color: AppTheme.greyColor, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    isXp ? '${user.totalLifetimeXp}' : '${user.longestStreak}',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600),
-                  ),
-                  Text(isXp ? 'Point' : 'Ngày', style: TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                ],
-              )
-            ],
-          ),
-        );
-      },
+  Widget _buildList(Leaderboard board, {required bool isXp}) {
+    final myId = AppState.I.user?.id;
+    final inTop = board.items.any((e) => e.userId == myId);
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: board.items.isEmpty
+          ? ListView(children: [SizedBox(height: 300, child: EmptyView(message: tr('Chưa có ai trên bảng xếp hạng'), icon: Icons.emoji_events_outlined))])
+          : ListView.builder(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
+              itemCount: board.items.length + (!inTop && board.myRank != null ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == board.items.length) return _myRankCard(board, isXp);
+                return _entryCard(board.items[index], isXp: isXp, isMe: board.items[index].userId == myId);
+              },
+            ),
     );
   }
 
-  Color _getRankColor(int rank) {
+  Widget _entryCard(LeaderboardEntry entry, {required bool isXp, required bool isMe}) {
+    final rank = entry.rank;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topColor = _rankColor(rank);
+    final borderColors = entry.colors.isNotEmpty ? entry.colors : const [Color(0xFFE2E8F0), Color(0xFFCBD5E1)];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isMe ? (isDark ? const Color(0xFF1F2E4A) : const Color(0xFFF0F5FF)) : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: rank <= 3 ? Border.all(color: topColor, width: 2) : (isMe ? Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)) : null),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 34,
+            child: rank <= 3
+                ? Icon(Icons.emoji_events, color: topColor, size: 28)
+                : Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.greyColor, fontSize: 15)),
+          ),
+          const SizedBox(width: 10),
+          // Viền đang trang bị của người chơi; ảnh được cắt tròn bên trong viền nên không bị tràn
+          UserAvatar(
+            size: 50,
+            ringWidth: 3,
+            borderColors: borderColors,
+            imageUrl: entry.avatarUrl,
+            initials: initialsOf(entry.fullName),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isMe ? '${entry.fullName} (${tr('Bạn')})' : entry.fullName,
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 3),
+                Text(
+                  entry.slogan.isEmpty ? tr('Chưa có câu châm ngôn') : entry.slogan,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppTheme.greyColor, fontSize: 12, fontStyle: FontStyle.italic.takeIf(entry.slogan.isNotEmpty)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${entry.score}',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
+              Text(isXp ? 'Point' : tr('Ngày'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _myRankCard(Leaderboard board, bool isXp) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F5FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.person_pin_circle_outlined, color: AppTheme.primaryColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(trf('Hạng của bạn: #{r}', {'r': board.myRank ?? 0}),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          ),
+          Text('${board.myScore} ${isXp ? 'Point' : tr('Ngày')}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+        ],
+      ),
+    );
+  }
+
+  Color _rankColor(int rank) {
     if (rank == 1) return const Color(0xFFFFD700);
-    if (rank == 2) return const Color(0xFF94A3B8); // Màu bạc xám xanh nổi bật
+    if (rank == 2) return const Color(0xFF94A3B8);
     if (rank == 3) return const Color(0xFFCD7F32);
     return AppTheme.primaryColor;
   }
+}
+
+extension on FontStyle {
+  /// Chỉ in nghiêng khi [condition] đúng (slogan thật), còn câu mặc định thì chữ thường.
+  FontStyle takeIf(bool condition) => condition ? this : FontStyle.normal;
 }

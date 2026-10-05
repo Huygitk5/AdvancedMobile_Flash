@@ -9,10 +9,13 @@ import com.flash.stats.service.StatsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @Tag(name = "Users", description = "Hồ sơ, mật khẩu, cài đặt của người dùng hiện tại")
 @RestController
@@ -23,10 +26,15 @@ public class StatsController {
     private final StatsService statsService;
 
     @Operation(summary = "Thống kê học tập (ProgressScreen)",
-            description = "WEEK/MONTH trả đủ 7/30 ngày (ngày không học = 0); accuracy = correctAnswers / totalAnswers")
+            description = "WEEK/MONTH trả đủ 7/30 ngày (ngày không học = 0). YEAR (365 ngày gần nhất) và ALL chỉ trả "
+                    + "các ngày có dữ liệu để client gom theo tháng. CUSTOM cần from/to (yyyy-MM-dd, tối đa 366 ngày). "
+                    + "accuracy = correctAnswers / totalAnswers")
     @GetMapping("/me/statistics")
-    public ApiResponse<StatisticsResponse> statistics(@CurrentUser UserPrincipal me,
-                                                      @RequestParam(defaultValue = "WEEK") StatsRange range) {
-        return ApiResponse.ok(statsService.statistics(me.getId(), range));
+    public ApiResponse<StatisticsResponse> statistics(
+            @CurrentUser UserPrincipal me,
+            @RequestParam(defaultValue = "WEEK") StatsRange range,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.ok(statsService.statistics(me.getId(), range, from, to));
     }
 }

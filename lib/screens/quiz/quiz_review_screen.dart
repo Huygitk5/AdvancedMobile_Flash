@@ -1,29 +1,26 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import '../../models/quiz_result_model.dart';
-import '../../models/quiz_review_model.dart';
-import '../../data/mock_data.dart';
+import '../../models/quiz_model.dart';
 
 class QuizReviewScreen extends StatelessWidget {
-  final QuizResult result;
   final List<QuizReviewItem> reviewData;
 
-  const QuizReviewScreen({Key? key, required this.result, required this.reviewData}) : super(key: key);
+  const QuizReviewScreen({super.key, required this.reviewData});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Kết quả bài làm', style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new,  size: 20), onPressed: () => Navigator.pop(context)),
+        title: Text(tr('Kết quả bài làm'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
         elevation: 0,
-        centerTitle: true,
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(20),
-        itemCount: reviewData.length, // Đổi từ MockData.mockReviewData.length sang reviewData.length
+        itemCount: reviewData.length,
         itemBuilder: (context, index) {
-          final data = reviewData[index]; // Đổi từ MockData.mockReviewData[index]
+          final data = reviewData[index];
           return _QuestionReviewCard(
             questionIndex: index + 1,
             data: data,
@@ -38,7 +35,7 @@ class _QuestionReviewCard extends StatefulWidget {
   final int questionIndex;
   final QuizReviewItem data; // Sử dụng Model QuizReviewItem
 
-  const _QuestionReviewCard({Key? key, required this.questionIndex, required this.data}) : super(key: key);
+  const _QuestionReviewCard({required this.questionIndex, required this.data});
 
   @override
   State<_QuestionReviewCard> createState() => _QuestionReviewCardState();
@@ -77,13 +74,13 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: mainThemeColor,
-                child: Text('${widget.questionIndex}', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 14, fontWeight: FontWeight.bold)),
+                child: Text('${widget.questionIndex}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   widget.data.question,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, ),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -98,7 +95,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
                   children: [
                     Icon(isCorrect ? Icons.check_circle : Icons.cancel, color: mainThemeColor, size: 16),
                     const SizedBox(width: 4),
-                    Text(isCorrect ? 'Đúng' : 'Sai', style: TextStyle(color: mainThemeColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(isCorrect ? tr('Đúng') : tr('Sai'), style: TextStyle(color: mainThemeColor, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
               ),
@@ -107,13 +104,13 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
           const SizedBox(height: 20),
 
           // 2. Danh sách 4 đáp án
-          ...List.generate(4, (index) {
+          ...List.generate(widget.data.options.length, (index) {
             final String optionText = widget.data.options[index];
             final bool isSelected = index == userIndex;
             final bool isActualCorrect = index == correctIndex;
 
             // Mặc định cho đáp án chưa chọn
-            Color bgColor = Colors.white;
+            Color bgColor = Theme.of(context).cardColor;
             Color textColor = AppTheme.greyColor;
             Color circleBgColor = Colors.grey.shade200;
             Color circleTextColor = AppTheme.greyColor;
@@ -138,7 +135,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
               iconColor = const Color(0xFFC62828);
             } else if (!isSelected && isActualCorrect) {
               // Đáp án đúng thực sự (nhưng user không chọn)
-              bgColor = Colors.white;
+              bgColor = Theme.of(context).cardColor;
               textColor = const Color(0xFF2E7D32);
               circleBgColor = const Color(0xFFE8F5E9);
               circleTextColor = const Color(0xFF2E7D32);
@@ -152,7 +149,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isSelected ? bgColor : Colors.white),
+                border: Border.all(color: isSelected ? bgColor : Theme.of(context).cardColor),
               ),
               child: Row(
                 children: [
@@ -191,7 +188,7 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
                 children: [
                   Icon(Icons.lightbulb_outline, color: mainThemeColor, size: 20),
                   const SizedBox(width: 8),
-                  Text('Giải thích', style: TextStyle(color: mainThemeColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(tr('Giải thích'), style: TextStyle(color: mainThemeColor, fontWeight: FontWeight.bold, fontSize: 14)),
                   const Spacer(),
                   Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: mainThemeColor, size: 20),
                 ],
@@ -207,8 +204,8 @@ class _QuestionReviewCardState extends State<_QuestionReviewCard> {
                 ? Padding(
               padding: const EdgeInsets.only(top: 8.0, left: 28.0),
               child: Text(
-                widget.data.explanation,
-                style: TextStyle( fontSize: 14, height: 1.5),
+                widget.data.explanation.isEmpty ? tr('Chưa có giải thích cho câu này.') : widget.data.explanation,
+                style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF1E293B)),
               ),
             )
                 : const SizedBox.shrink(),

@@ -1,216 +1,271 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
+import '../../core/settings.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/reward_item_model.dart';
+import '../../data/app_state.dart';
+import '../../data/content_repository.dart';
+import '../../data/game_repository.dart';
+import '../../data/user_repository.dart';
+import '../../models/flashcard_model.dart';
+import '../../widgets/common.dart';
+import 'saved_words_screen.dart';
 import 'settings_screen.dart';
 import 'shop_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  List<Flashcard> _saved = const [];
+  int _savedCount = 0;
+  int? _rank;
+  bool _loading = true;
 
-  List<Color> get equippedBorderColors {
+  @override
+  void initState() {
+    super.initState();
+    AppState.I.addListener(_onUserChanged);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    AppState.I.removeListener(_onUserChanged);
+    super.dispose();
+  }
+
+  void _onUserChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
     try {
-      final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'border');
-      final item = MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-      return item.borderColors.map((hex) => Color(hex)).toList();
-    } catch (e) {
-      return [const Color(0xFFE2E8F0), const Color(0xFFCBD5E1)]; // Trắng xám mặc định
+      final results = await Future.wait([
+        ContentRepository.bookmarks(size: 5),
+        GameRepository.leaderboard('xp', limit: 1),
+        AppState.I.refreshAll(),
+      ]);
+      if (!mounted) return;
+      final saved = results[0] as PageResult<Flashcard>;
+      setState(() {
+        _saved = saved.items;
+        _savedCount = saved.totalElements;
+        _rank = (results[1] as dynamic).myRank as int?;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  RewardItem? get equippedAvatar {
-    try {
-      final inv = MockData.myInventory.firstWhere((i) => i.isEquipped && MockData.shopItems.firstWhere((s) => s.id == i.rewardItemId).type == 'avatar');
-      return MockData.shopItems.firstWhere((s) => s.id == inv.rewardItemId);
-    } catch (e) { return null; }
-  }
-
-  void _showEditNoteDialog() {
-    TextEditingController noteController = TextEditingController(text: MockData.currentUser.slogan);
-
+  void _showEditSloganDialog() {
+    final controller = TextEditingController(text: AppState.I.user?.slogan ?? '');
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Cập nhật Slogan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: noteController,
-          maxLength: 30,
-          decoration: InputDecoration(
-            hintText: 'Nhập câu châm ngôn của bạn...',
-            filled: true,
-            fillColor: const Color(0xFFF4F6FA),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+      builder: (dialogContext) {
+        var saving = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(tr('Cập nhật Slogan'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            content: TextField(
+              controller: controller,
+              maxLength: 30,
+              decoration: InputDecoration(
+                hintText: tr('Nhập câu châm ngôn của bạn...'),
+                filled: true,
+                fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF273449) : const Color(0xFFF4F6FA),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        setDialogState(() => saving = true);
+                        try {
+                          await UserRepository.updateSlogan(controller.text);
+                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        } catch (e) {
+                          setDialogState(() => saving = false);
+                          if (mounted) showAppSnack(this.context, errorMessage(e), error: true);
+                        }
+                      },
+                child: Text(tr('Lưu'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-            onPressed: () {
-              setState(() {
-                // Cập nhật Slogan thẳng vào UserModel
-                MockData.currentUser.slogan = noteController.text.trim();
-              });
-              Navigator.pop(context);
-            },
-            child: Text('Lưu', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+        );
+      },
+    ).then((_) => controller.dispose());
   }
 
   @override
   Widget build(BuildContext context) {
-    // Gọi user hiện tại
-    final user = MockData.currentUser;
+    final app = AppState.I;
+    final user = app.user;
+    if (user == null) return const Scaffold(body: LoadingView());
+    final cardColor = Theme.of(context).cardColor;
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
-        title: Text('Hồ sơ cá nhân', style: TextStyle( fontSize: 22, fontWeight: FontWeight.bold)),
+        title: Text(tr('Hồ sơ cá nhân'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: Icon(Icons.settings_outlined, ),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
-          )
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          ),
         ],
       ),
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: equippedBorderColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 100 + MediaQuery.of(context).padding.bottom),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          UserAvatar(
+                            size: 78,
+                            ringWidth: 4,
+                            borderColors: app.equippedBorderColors,
+                            imageUrl: app.equippedAvatarUrl,
+                            initials: initialsOf(user.fullName),
                           ),
-                          child: CircleAvatar(
-                            radius: 35,
-                            backgroundColor: const Color(0xFFEEF2FF),
-                            backgroundImage: (equippedAvatar != null && equippedAvatar!.imageUrl != null && equippedAvatar!.imageUrl!.isNotEmpty)
-                                ? NetworkImage(equippedAvatar!.imageUrl!) as ImageProvider
-                                : null,
-                            child: (equippedAvatar == null || equippedAvatar!.imageUrl == null || equippedAvatar!.imageUrl!.isEmpty)
-                                ? Icon(Icons.person, size: 40, color: AppTheme.primaryColor)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  // Lấy Tên từ UserModel
-                                  Expanded(
-                                    child: Text(user.fullName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, ), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
-                                    child: Text('Top 1 Point', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 5),
-                              // Lấy Email từ UserModel
-                              Text(user.email, style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                              const SizedBox(height: 5),
-                              GestureDetector(
-                                onTap: _showEditNoteDialog,
-                                child: Row(
+                          const SizedBox(width: 18),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
                                     Expanded(
-                                      // Lấy Slogan từ UserModel
-                                      child: Text(user.slogan, style: TextStyle(color: AppTheme.primaryColor, fontSize: 13, fontStyle: FontStyle.italic), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      child: Text(user.fullName,
+                                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                     ),
-                                    Icon(Icons.edit, size: 14, color: AppTheme.primaryColor),
+                                    if (_rank != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
+                                        child: Text(trf('Hạng {n}', {'n': _rank!}),
+                                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
                                   ],
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  // Lấy Level
-                                  Text(user.level, style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
-                                  const Spacer(),
-                                  Icon(Icons.stars, color: Colors.amber, size: 16),
-                                  const SizedBox(width: 4),
-                                  // Lấy XP hiện tại để mua sắm
-                                  Text('${user.currentXp} XP', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
-                                ],
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                Text(user.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                GestureDetector(
+                                  onTap: _showEditSloganDialog,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          user.slogan.isEmpty ? tr('Thêm câu châm ngôn') : user.slogan,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: AppTheme.primaryColor, fontSize: 13, fontStyle: FontStyle.italic),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.edit, size: 14, color: AppTheme.primaryColor),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Text(user.level, style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.stars, color: Colors.amber, size: 16),
+                                            const SizedBox(width: 4),
+                                            Text('${user.currentXp} XP', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFF7E6), foregroundColor: Colors.orange, elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        ),
-                        icon: Icon(Icons.storefront),
-                        label: Text('Cửa hàng đổi thưởng', style: TextStyle(fontWeight: FontWeight.bold)),
-                        onPressed: () async {
-                          // Điều hướng sang Shop, đợi quay về rồi reload UI để cập nhật XP/Viền mới
-                          await Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen()));
-                          setState(() {});
-                        },
+                        ],
                       ),
-                    )
-                  ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFF7E6),
+                            foregroundColor: Colors.orange,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          ),
+                          icon: const Icon(Icons.storefront),
+                          label: Text(tr('Cửa hàng đổi thưởng'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            await Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+                            if (mounted) _load();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildStatTile(Icons.local_fire_department, Colors.orange, tr('Streak'), trf('{n} ngày', {'n': user.streakDays})),
+                      const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
+                      _buildStatTile(Icons.menu_book, Colors.green, tr('Tổng số từ đã học'), '${user.totalWordsLearned}'),
+                      const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
+                      _buildStatTile(Icons.task_alt, Colors.blue, tr('Số bài hoàn thành'), '${user.completedLessons}'),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    // Cập nhật động dữ liệu thống kê từ UserModel
-                    _buildStatTile(Icons.local_fire_department, Colors.orange, 'Streak', '${user.streakDays} ngày'),
-                    const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
-                    _buildStatTile(Icons.menu_book, Colors.green, 'Tổng số từ đã học', '${user.totalWordsLearned}'),
-                    const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
-                    _buildStatTile(Icons.task_alt, Colors.blue, 'Số bài hoàn thành', '${user.completedLessons}'),
-                  ],
-                ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                _buildSavedWords(context),
+              ],
+            ),
           ),
         ),
       ),
@@ -220,8 +275,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatTile(IconData icon, Color iconColor, String title, String value) {
     return ListTile(
       leading: Icon(icon, color: iconColor),
-      title: Text(title, style: TextStyle(fontSize: 15, )),
-      trailing: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, )),
+      title: Text(title, style: const TextStyle(fontSize: 15)),
+      trailing: Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  /// Danh sách từ đã lưu (xem trước 5 từ), bấm "Xem tất cả" để mở đầy đủ.
+  Widget _buildSavedWords(BuildContext context) {
+    final cardColor = Theme.of(context).cardColor;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.bookmark, color: Colors.amber),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(trf('Từ đã lưu ({n})', {'n': _savedCount}), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              if (_savedCount > 0)
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedWordsScreen()));
+                    if (mounted) _load();
+                  },
+                  child: Text(tr('Xem tất cả'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
+          else if (_saved.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(tr('Chưa có từ nào được lưu. Bấm biểu tượng dấu trang trên thẻ từ vựng để lưu.'),
+                  style: const TextStyle(color: AppTheme.greyColor, fontSize: 13, height: 1.4)),
+            )
+          else
+            for (final word in _saved)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(word.word, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text(word.meaning, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.volume_up, color: AppTheme.primaryColor, size: 22),
+                      onPressed: () => SpeechService.speak(word.word),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
     );
   }
 }

@@ -1,0 +1,79 @@
+import 'package:flutter/material.dart';
+
+/// Tên Material icon do server trả về cho chủ điểm ngữ pháp -> IconData.
+IconData grammarIcon(String name) {
+  switch (name) {
+    case 'account_tree':
+      return Icons.account_tree_outlined;
+    case 'person':
+      return Icons.person_outline;
+    case 'access_alarm':
+      return Icons.access_alarm;
+    case 'place':
+      return Icons.place_outlined;
+    case 'label':
+      return Icons.label_outline;
+    case 'format_list_numbered':
+      return Icons.format_list_numbered;
+    case 'scale':
+      return Icons.scale_outlined;
+    case 'people':
+      return Icons.people_outline;
+    case 'pin_drop':
+      return Icons.pin_drop_outlined;
+    case 'help_outline':
+      return Icons.help_outline;
+    case 'check_circle':
+      return Icons.check_circle_outline;
+    case 'repeat':
+      return Icons.repeat;
+    case 'trending_up':
+      return Icons.trending_up;
+    case 'history_edu':
+      return Icons.history_edu;
+    case 'schedule':
+      return Icons.schedule;
+    case 'bolt':
+      return Icons.bolt;
+    case 'directions_run':
+      return Icons.directions_run;
+    case 'verified_user':
+      return Icons.verified_user_outlined;
+    case 'priority_high':
+      return Icons.priority_high;
+    case 'restore':
+      return Icons.restore;
+    case 'link':
+      return Icons.link;
+    case 'tune':
+      return Icons.tune;
+    case 'swap_horiz':
+      return Icons.swap_horiz;
+    case 'hourglass_bottom':
+      return Icons.hourglass_bottom;
+    case 'undo':
+      return Icons.undo;
+    case 'update':
+      return Icons.update;
+    case 'event_available':
+      return Icons.event_available;
+    case 'compare_arrows':
+      return Icons.compare_arrows;
+    case 'alt_route':
+      return Icons.alt_route;
+    case 'record_voice_over':
+      return Icons.record_voice_over;
+    case 'psychology':
+      return Icons.psychology_outlined;
+    case 'question_answer':
+      return Icons.question_answer_outlined;
+    case 'star_border':
+      return Icons.star_border;
+    case 'build':
+      return Icons.build_outlined;
+    case 'flip':
+      return Icons.flip;
+    default:
+      return Icons.account_tree_outlined;
+  }
+}

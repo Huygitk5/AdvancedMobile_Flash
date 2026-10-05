@@ -1,152 +1,205 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
+import '../../data/admin_repository.dart';
 import '../../models/flashcard_model.dart';
+import '../../widgets/common.dart';
+import 'admin_widgets.dart';
 
+/// Quản lý từ vựng của một chủ đề.
 class AdminFlashcardsScreen extends StatefulWidget {
   final String topicId;
   final String topicTitle;
 
-  const AdminFlashcardsScreen({Key? key, required this.topicId, required this.topicTitle}) : super(key: key);
+  const AdminFlashcardsScreen({super.key, required this.topicId, required this.topicTitle});
 
   @override
   State<AdminFlashcardsScreen> createState() => _AdminFlashcardsScreenState();
 }
 
 class _AdminFlashcardsScreenState extends State<AdminFlashcardsScreen> {
-  late List<Flashcard> flashcards;
+  List<Flashcard> _cards = const [];
+  bool _loading = true;
+  String? _error;
+  String _keyword = '';
 
   @override
   void initState() {
     super.initState();
-    // Giả lập API GET /v1/flashcards?topicId=...
-    flashcards = MockData.flashcards.where((f) => f.topicId == widget.topicId).toList();
+    _load();
   }
 
-  void _deleteFlashcard(String flashcardId) {
-    setState(() {
-      flashcards.removeWhere((f) => f.id == flashcardId);
-      MockData.flashcards.removeWhere((f) => f.id == flashcardId); // Cập nhật cả DB giả lập
-    });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa từ vựng!'), backgroundColor: Colors.red));
+  Future<void> _load() async {
+    try {
+      final cards = await AdminRepository.flashcards(widget.topicId);
+      if (!mounted) return;
+      setState(() {
+        _cards = cards;
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
   }
 
-  void _showFlashcardFormDialog({Flashcard? existingCard}) {
-    final wordController = TextEditingController(text: existingCard?.word ?? '');
-    final typeController = TextEditingController(text: existingCard?.partOfSpeech ?? 'n.');
-    final pronunciationController = TextEditingController(text: existingCard?.pronunciation ?? '');
-    final meaningController = TextEditingController(text: existingCard?.meaning ?? '');
-    final exampleController = TextEditingController(text: existingCard?.example ?? ''); // Thêm ô nhập Ví dụ
-    final transController = TextEditingController(text: existingCard?.exampleTranslation ?? ''); // Thêm ô Dịch
+  Future<void> _delete(Flashcard card) async {
+    if (!await confirmDelete(context, card.word)) return;
+    try {
+      await AdminRepository.deleteFlashcard(card.id);
+      if (!mounted) return;
+      showAppSnack(context, tr('Đã xóa từ vựng!'));
+      _load();
+    } catch (e) {
+      if (mounted) showAppSnack(context, errorMessage(e), error: true);
+    }
+  }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(existingCard == null ? 'Thêm Từ vựng' : 'Sửa Từ vựng', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: wordController, decoration: InputDecoration(labelText: 'Từ vựng (Word)', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-              const SizedBox(height: 10),
-              TextField(controller: typeController, decoration: InputDecoration(labelText: 'Từ loại (n., v., adj.)', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-              const SizedBox(height: 10),
-              TextField(controller: pronunciationController, decoration: InputDecoration(labelText: 'Phiên âm', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-              const SizedBox(height: 10),
-              TextField(controller: meaningController, decoration: InputDecoration(labelText: 'Nghĩa tiếng Việt', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-              const SizedBox(height: 10),
-              TextField(controller: exampleController, maxLines: 2, decoration: InputDecoration(labelText: 'Câu ví dụ', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-              const SizedBox(height: 10),
-              TextField(controller: transController, maxLines: 2, decoration: InputDecoration(labelText: 'Dịch nghĩa ví dụ', filled: true, fillColor: const Color(0xFFF4F6FA), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none))),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-            onPressed: () {
-              setState(() {
-                if (existingCard == null) {
-                  flashcards.add(Flashcard(id: DateTime.now().millisecondsSinceEpoch.toString(), topicId: widget.topicId, word: wordController.text, partOfSpeech: typeController.text, pronunciation: pronunciationController.text, meaning: meaningController.text, example: exampleController.text, exampleTranslation: transController.text));
-                } else {
-                  final index = flashcards.indexWhere((f) => f.id == existingCard.id);
-                  flashcards[index] = Flashcard(id: existingCard.id, topicId: existingCard.topicId, word: wordController.text, partOfSpeech: typeController.text, pronunciation: pronunciationController.text, meaning: meaningController.text, example: exampleController.text, exampleTranslation: transController.text, note: existingCard.note);
-                }
-              });
-              Navigator.pop(context);
-            },
-            child: Text('Lưu', style: TextStyle(color: Theme.of(context).cardColor)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _openForm([Flashcard? card]) async {
+    final saved = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => FlashcardFormScreen(topicId: widget.topicId, existing: card)));
+    if (saved == true) _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    final shown = _cards.where((c) => c.word.toLowerCase().contains(_keyword.toLowerCase()) || c.meaning.toLowerCase().contains(_keyword.toLowerCase())).toList();
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,  size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Từ vựng: ${widget.topicTitle}', style: TextStyle( fontSize: 18, fontWeight: FontWeight.bold)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
+        title: Text(widget.topicTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ),
-      body: flashcards.isEmpty
-          ? const Center(child: Text('Chưa có từ vựng nào trong chủ đề này.', style: TextStyle(color: AppTheme.greyColor)))
-          : ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: flashcards.length,
-        itemBuilder: (context, index) {
-          final card = flashcards[index];
-          return Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(15),
-              title: Row(
-                children: [
-                  Text(card.word, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, )),
-                  const SizedBox(width: 8),
-                  Text('(${card.partOfSpeech})', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
-                ],
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 5),
-                  Text(card.meaning, style: TextStyle(fontSize: 15, color: Colors.black87)),
-                  const SizedBox(height: 5),
-                  Text('VD: ${card.example}', style: TextStyle(color: AppTheme.greyColor, fontStyle: FontStyle.italic)),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.edit, color: Colors.amber),
-                    onPressed: () => _showFlashcardFormDialog(existingCard: card),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deleteFlashcard(card.id),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: adminSearchField(context, hint: tr('Tìm từ vựng...'), onChanged: (v) => setState(() => _keyword = v)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Align(alignment: Alignment.centerLeft, child: Text(trf('{n} từ', {'n': _cards.length}), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12))),
+          ),
+          Expanded(
+            child: _loading
+                ? const LoadingView()
+                : _error != null
+                    ? ErrorView(message: _error!, onRetry: _load)
+                    : shown.isEmpty
+                        ? EmptyView(message: tr('Chưa có từ vựng nào'), icon: Icons.style_outlined)
+                        : RefreshIndicator(
+                            onRefresh: _load,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
+                              itemCount: shown.length,
+                              itemBuilder: (context, i) {
+                                final card = shown[i];
+                                return Card(
+                                  elevation: 2,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  child: ListTile(
+                                    title: Text('${card.word}  ${card.partOfSpeech.isEmpty ? '' : '(${card.partOfSpeech})'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text('${card.pronunciation}\n${card.meaning}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    isThreeLine: true,
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(icon: const Icon(Icons.edit, color: Colors.amber), onPressed: () => _openForm(card)),
+                                        IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _delete(card)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primaryColor,
-        onPressed: () => _showFlashcardFormDialog(),
-        icon: Icon(Icons.add, color: Theme.of(context).cardColor),
-        label: Text('Thêm từ', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
+        onPressed: () => _openForm(),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
+    );
+  }
+}
+
+class FlashcardFormScreen extends StatefulWidget {
+  final String topicId;
+  final Flashcard? existing;
+
+  const FlashcardFormScreen({super.key, required this.topicId, this.existing});
+
+  @override
+  State<FlashcardFormScreen> createState() => _FlashcardFormScreenState();
+}
+
+class _FlashcardFormScreenState extends State<FlashcardFormScreen> {
+  late final TextEditingController _word = TextEditingController(text: widget.existing?.word ?? '');
+  late final TextEditingController _pos = TextEditingController(text: widget.existing?.partOfSpeech ?? 'n.');
+  late final TextEditingController _ipa = TextEditingController(text: widget.existing?.pronunciation ?? '');
+  late final TextEditingController _meaning = TextEditingController(text: widget.existing?.meaning ?? '');
+  late final TextEditingController _example = TextEditingController(text: widget.existing?.example ?? '');
+  late final TextEditingController _translation = TextEditingController(text: widget.existing?.exampleTranslation ?? '');
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    for (final c in [_word, _pos, _ipa, _meaning, _example, _translation]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_word.text.trim().isEmpty || _meaning.text.trim().isEmpty || _ipa.text.trim().isEmpty || _pos.text.trim().isEmpty) {
+      showAppSnack(context, tr('Vui lòng nhập từ, loại từ, phiên âm và nghĩa'), error: true);
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await AdminRepository.saveFlashcard(widget.existing?.id, {
+        'topicId': widget.topicId,
+        'word': _word.text.trim(),
+        'partOfSpeech': _pos.text.trim(),
+        'pronunciation': _ipa.text.trim(),
+        'meaning': _meaning.text.trim(),
+        'example': _example.text.trim(),
+        'exampleTranslation': _translation.text.trim(),
+      });
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, errorMessage(e), error: true);
+      setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminFormShell(
+      title: widget.existing == null ? tr('Thêm từ vựng') : tr('Sửa từ vựng'),
+      saving: _saving,
+      onSave: _save,
+      children: [
+        TextField(controller: _word, decoration: formDecoration(tr('Từ vựng'))),
+        formGap(),
+        TextField(controller: _pos, decoration: formDecoration(tr('Loại từ'), hint: 'n. / v. / adj.')),
+        formGap(),
+        TextField(controller: _ipa, decoration: formDecoration(tr('Phiên âm'), hint: '/ˈbjuːtɪfl/')),
+        formGap(),
+        TextField(controller: _meaning, decoration: formDecoration(tr('Nghĩa'))),
+        formGap(),
+        TextField(controller: _example, maxLines: 2, decoration: formDecoration(tr('Câu ví dụ'))),
+        formGap(),
+        TextField(controller: _translation, maxLines: 2, decoration: formDecoration(tr('Dịch câu ví dụ'))),
+      ],
     );
   }
 }

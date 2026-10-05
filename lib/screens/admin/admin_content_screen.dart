@@ -1,47 +1,75 @@
 import 'package:flutter/material.dart';
+import '../../core/icons.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import '../../data/mock_data.dart';
-import '../../models/topic_model.dart';
+import '../../data/admin_repository.dart';
 import '../../models/grammar_model.dart';
+import '../../models/quiz_model.dart';
+import '../../models/topic_model.dart';
+import '../../widgets/common.dart';
 import 'admin_flashcards_screen.dart';
-import 'admin_quiz_questions_screen.dart';
-import 'admin_grammar_examples_screen.dart';
+import 'admin_quiz_form_screen.dart';
+import 'admin_widgets.dart';
 
 class AdminContentScreen extends StatefulWidget {
-  const AdminContentScreen({Key? key}) : super(key: key);
+  const AdminContentScreen({super.key});
 
   @override
   State<AdminContentScreen> createState() => _AdminContentScreenState();
 }
 
 class _AdminContentScreenState extends State<AdminContentScreen> {
-  late List<Topic> topics;
-  late List<Grammar> grammars;
-  late List<Map<String, dynamic>> quizzes;
-  String searchQuery = ''; // Tìm kiếm
+  List<Topic> _topics = const [];
+  List<Grammar> _grammar = const [];
+  List<QuizInfo> _quizzes = const [];
+  bool _loading = true;
+  String? _error;
+  String _keyword = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _load();
   }
 
-  void _loadData() {
-    topics = List.from(MockData.vocabularyTopics);
-    grammars = List.from(MockData.grammarTopics);
-    quizzes = [
-      {'id': 'q1', 'title': 'Test: Daily Life', 'questions': 10, 'pass': '70%'},
-      {'id': 'q2', 'title': 'Test: Present Simple', 'questions': 15, 'pass': '80%'},
-    ];
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([AdminRepository.topics(), AdminRepository.grammarLessons(), AdminRepository.quizzes()]);
+      if (!mounted) return;
+      setState(() {
+        _topics = results[0] as List<Topic>;
+        _grammar = results[1] as List<Grammar>;
+        _quizzes = results[2] as List<QuizInfo>;
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
   }
 
-  void _openFullScreenForm(Widget formScreen) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (context) => formScreen));
-    setState(() => _loadData()); // Tải lại sau khi tắt form
+  Future<void> _openForm(Widget screen) async {
+    final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => screen));
+    if (saved == true) _load();
   }
 
-  void _deleteTopic(String id) => setState(() { MockData.vocabularyTopics.removeWhere((t) => t.id == id); _loadData(); });
-  void _deleteGrammar(String id) => setState(() { MockData.grammarTopics.removeWhere((g) => g.id == id); _loadData(); });
+  Future<void> _delete(String name, Future<void> Function() action, String success) async {
+    if (!await confirmDelete(context, name)) return;
+    try {
+      await action();
+      if (!mounted) return;
+      showAppSnack(context, success);
+      _load();
+    } catch (e) {
+      if (mounted) showAppSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  bool _match(String text) => text.toLowerCase().contains(_keyword.toLowerCase());
 
   @override
   Widget build(BuildContext context) {
@@ -49,23 +77,27 @@ class _AdminContentScreenState extends State<AdminContentScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          elevation: 0, automaticallyImplyLeading: false,
-          title: Text('Kho Nội dung', style: TextStyle( fontSize: 20, fontWeight: FontWeight.bold)),
-          bottom: const TabBar(labelColor: AppTheme.primaryColor, unselectedLabelColor: AppTheme.greyColor, tabs: [Tab(text: 'Từ vựng'), Tab(text: 'Ngữ pháp'), Tab(text: 'Quiz')]),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Text(tr('Kho Nội dung'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          bottom: TabBar(
+            labelColor: AppTheme.primaryColor,
+            unselectedLabelColor: AppTheme.greyColor,
+            tabs: [Tab(text: tr('Từ vựng')), Tab(text: tr('Ngữ pháp')), Tab(text: 'Quiz')],
+          ),
         ),
         body: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(20),
-              child: TextField(
-                onChanged: (val) => setState(() => searchQuery = val),
-                decoration: InputDecoration(hintText: 'Tìm kiếm nội dung...', prefixIcon: Icon(Icons.search), filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
-              ),
+              child: adminSearchField(context, hint: tr('Tìm kiếm nội dung...'), onChanged: (v) => setState(() => _keyword = v)),
             ),
             Expanded(
-              child: TabBarView(
-                children: [ _buildTopicTab(), _buildGrammarTab(), _buildQuizTab() ],
-              ),
+              child: _loading
+                  ? const LoadingView()
+                  : _error != null
+                      ? ErrorView(message: _error!, onRetry: _load)
+                      : TabBarView(children: [_topicTab(), _grammarTab(), _quizTab()]),
             ),
           ],
         ),
@@ -73,203 +105,377 @@ class _AdminContentScreenState extends State<AdminContentScreen> {
     );
   }
 
-  Widget _buildTopicTab() {
-    final filteredTopics = topics.where((t) => t.title.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+  Widget _listShell({required List<Widget> items, required Color fabColor, required VoidCallback onAdd}) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: filteredTopics.length,
-        itemBuilder: (context, index) {
-          final topic = filteredTopics[index];
-          return Card(
-            elevation: 2, margin: const EdgeInsets.only(bottom: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: ListTile(
-              leading: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)), child: Text(topic.iconPath, style: TextStyle(fontSize: 24))),
-              title: Text(topic.title, style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${topic.totalWords} từ vựng'),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(Icons.edit, color: Colors.amber), onPressed: () => _openFullScreenForm(TopicFormScreen(existingTopic: topic))), IconButton(icon: Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteTopic(topic.id))]),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AdminFlashcardsScreen(topicId: topic.id, topicTitle: topic.title))),
-            ),
-          );
-        },
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: items.isEmpty
+            ? ListView(children: [SizedBox(height: 260, child: EmptyView(message: tr('Không có dữ liệu'), icon: Icons.inbox_outlined))])
+            : ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 90), children: items),
       ),
-      floatingActionButton: FloatingActionButton(backgroundColor: AppTheme.primaryColor, onPressed: () => _openFullScreenForm(const TopicFormScreen()), child: Icon(Icons.add, color: Theme.of(context).cardColor)),
+      floatingActionButton: FloatingActionButton(backgroundColor: fabColor, onPressed: onAdd, child: const Icon(Icons.add, color: Colors.white)),
     );
   }
 
-  Widget _buildGrammarTab() {
-    final filteredGrammar = grammars.where((g) => g.title.toLowerCase().contains(searchQuery.toLowerCase())).toList();
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: filteredGrammar.length,
-        itemBuilder: (context, index) {
-          final grammar = filteredGrammar[index];
-          return Card(
-            elevation: 2, margin: const EdgeInsets.only(bottom: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: ListTile(
-              leading: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.menu_book, color: Colors.purple)),
-              title: Text(grammar.title, style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Cấu trúc, Ví dụ & Bài tập'),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(Icons.edit, color: Colors.amber), onPressed: () => _openFullScreenForm(GrammarFormScreen(existingGrammar: grammar))), IconButton(icon: Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteGrammar(grammar.id))]),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AdminGrammarExamplesScreen(grammarId: grammar.id, grammarTitle: grammar.title))),
-            ),
-          );
-        },
+  Widget _card({required Widget leading, required String title, required Widget subtitle, required VoidCallback onEdit, required VoidCallback onDelete, VoidCallback? onTap}) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        leading: leading,
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: subtitle,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(icon: const Icon(Icons.edit, color: Colors.amber), onPressed: onEdit),
+            IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: onDelete),
+          ],
+        ),
+        onTap: onTap,
       ),
-      floatingActionButton: FloatingActionButton(backgroundColor: Colors.purple, onPressed: () => _openFullScreenForm(const GrammarFormScreen()), child: Icon(Icons.add, color: Theme.of(context).cardColor)),
     );
   }
 
-  Widget _buildQuizTab() {
-    final filteredQuizzes = quizzes.where((q) => q['title'].toString().toLowerCase().contains(searchQuery.toLowerCase())).toList();
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: filteredQuizzes.length,
-        itemBuilder: (context, index) {
-          final quiz = filteredQuizzes[index];
-          return Card(
-            elevation: 2, margin: const EdgeInsets.only(bottom: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: ListTile(
-              leading: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.quiz, color: Colors.redAccent)),
-              title: Text(quiz['title'].toString(), style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${quiz['questions']} câu hỏi • Pass: ${quiz['pass']}'),
-              trailing: IconButton(
-                  icon: Icon(Icons.edit, color: Colors.amber),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => QuizFormScreen(
-                    existingQuiz: quiz,
-                    onSave: (updatedQuiz) {
-                      setState(() {
-                        quizzes[quizzes.indexWhere((q) => q['id'] == updatedQuiz['id'])] = updatedQuiz;
-                      });
-                    },
-                  )))
-              ),              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AdminQuizQuestionsScreen(quizId: quiz['id'].toString(), quizTitle: quiz['title'].toString()))),
+  Widget _topicTab() {
+    final shown = _topics.where((t) => _match(t.title)).toList();
+    return _listShell(
+      fabColor: AppTheme.primaryColor,
+      onAdd: () => _openForm(const TopicFormScreen()),
+      items: [
+        for (final topic in shown)
+          _card(
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(10)),
+              child: Text(topic.iconPath, style: const TextStyle(fontSize: 24)),
             ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-          backgroundColor: Colors.redAccent,
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => QuizFormScreen(
-            onSave: (newQuiz) {
-              setState(() {
-                quizzes.add(newQuiz);
-              });
+            title: topic.title,
+            subtitle: Row(children: [Text(trf('{n} từ vựng', {'n': topic.totalWords})), const SizedBox(width: 8), publishedBadge(topic.isPublished)]),
+            onEdit: () => _openForm(TopicFormScreen(existing: topic)),
+            onDelete: () => _delete(topic.title, () => AdminRepository.deleteTopic(topic.id), tr('Đã xóa chủ đề!')),
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => AdminFlashcardsScreen(topicId: topic.id, topicTitle: topic.title)));
+              _load();
             },
-          ))),
-          child: Icon(Icons.add, color: Theme.of(context).cardColor)
-      ),    );
+          ),
+      ],
+    );
+  }
+
+  Widget _grammarTab() {
+    final shown = _grammar.where((g) => _match(g.title)).toList();
+    return _listShell(
+      fabColor: Colors.purple,
+      onAdd: () => _openForm(const GrammarFormScreen()),
+      items: [
+        for (final g in shown)
+          _card(
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(10)),
+              child: Icon(grammarIcon(g.iconName), color: Colors.purple),
+            ),
+            title: g.title,
+            subtitle: Row(children: [Text(g.level), const SizedBox(width: 8), publishedBadge(g.isPublished)]),
+            onEdit: () => _openForm(GrammarFormScreen(existing: g)),
+            onDelete: () => _delete(g.title, () => AdminRepository.deleteGrammar(g.id), tr('Đã xóa chủ điểm!')),
+            onTap: () => _openForm(GrammarFormScreen(existing: g)),
+          ),
+      ],
+    );
+  }
+
+  Widget _quizTab() {
+    final shown = _quizzes.where((q) => _match(q.title)).toList();
+    return _listShell(
+      fabColor: Colors.redAccent,
+      onAdd: () => _openForm(const QuizFormScreen()),
+      items: [
+        for (final q in shown)
+          _card(
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.quiz, color: Colors.redAccent),
+            ),
+            title: q.title,
+            subtitle: Text(trf('{n} câu hỏi • Đạt: {p}%', {'n': q.questionCount, 'p': q.passScorePercent})),
+            onEdit: () => _openForm(QuizFormScreen(existing: q)),
+            onDelete: () => _delete(q.title, () => AdminRepository.deleteQuiz(q.id), tr('Đã xóa bài kiểm tra!')),
+            onTap: () => _openForm(QuizFormScreen(existing: q)),
+          ),
+      ],
+    );
   }
 }
 
-// ================= CÁC FORM FULL MÀN HÌNH =================
-
-// 1. TOPIC FORM
+// ================= FORM CHỦ ĐỀ =================
 class TopicFormScreen extends StatefulWidget {
-  final Topic? existingTopic;
-  const TopicFormScreen({Key? key, this.existingTopic}) : super(key: key);
+  final Topic? existing;
+
+  const TopicFormScreen({super.key, this.existing});
+
   @override
   State<TopicFormScreen> createState() => _TopicFormScreenState();
 }
+
 class _TopicFormScreenState extends State<TopicFormScreen> {
-  late TextEditingController titleCtrl, iconCtrl;
+  late final TextEditingController _title = TextEditingController(text: widget.existing?.title ?? '');
+  late final TextEditingController _icon = TextEditingController(text: widget.existing?.iconPath ?? '📚');
+  late final TextEditingController _desc = TextEditingController(text: widget.existing?.description ?? '');
+  late final TextEditingController _minutes = TextEditingController(text: '${widget.existing?.estimatedMinutes ?? 10}');
+  late String _level = widget.existing?.level ?? 'A1';
+  late bool _published = widget.existing?.isPublished ?? true;
+  bool _saving = false;
+
   @override
-  void initState() {
-    super.initState();
-    titleCtrl = TextEditingController(text: widget.existingTopic?.title ?? '');
-    iconCtrl = TextEditingController(text: widget.existingTopic?.iconPath ?? '📚');
+  void dispose() {
+    for (final c in [_title, _icon, _desc, _minutes]) {
+      c.dispose();
+    }
+    super.dispose();
   }
-  void _save() {
-    final newTopic = Topic(id: widget.existingTopic?.id ?? DateTime.now().millisecondsSinceEpoch.toString(), title: titleCtrl.text, totalWords: widget.existingTopic?.totalWords ?? 0, progress: widget.existingTopic?.progress ?? 0.0, iconPath: iconCtrl.text);
-    if (widget.existingTopic == null) MockData.vocabularyTopics.add(newTopic);
-    else MockData.vocabularyTopics[MockData.vocabularyTopics.indexWhere((t) => t.id == widget.existingTopic!.id)] = newTopic;
-    Navigator.pop(context);
+
+  Future<void> _save() async {
+    if (_title.text.trim().isEmpty || _icon.text.trim().isEmpty) {
+      showAppSnack(context, tr('Vui lòng nhập tên và icon'), error: true);
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await AdminRepository.saveTopic(widget.existing?.id, {
+        'title': _title.text.trim(),
+        'description': _desc.text.trim(),
+        'iconPath': _icon.text.trim(),
+        'level': _level,
+        'estimatedMinutes': (int.tryParse(_minutes.text) ?? 10).clamp(1, 600),
+        'isPublished': _published,
+      });
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, errorMessage(e), error: true);
+      setState(() => _saving = false);
+    }
   }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: Icon(Icons.close, ), onPressed: () => Navigator.pop(context)), title: Text(widget.existingTopic == null ? 'Thêm Chủ đề' : 'Sửa Chủ đề', style: TextStyle())),
-      body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [Expanded(child: ListView(children: [TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tên Chủ đề')), const SizedBox(height: 20), TextField(controller: iconCtrl, decoration: const InputDecoration(labelText: 'Icon (Emoji)'))])), SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 16)), onPressed: _save, child: Text('Xong (Done)', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold))))])),
+    return AdminFormShell(
+      title: widget.existing == null ? tr('Thêm Chủ đề') : tr('Sửa Chủ đề'),
+      saving: _saving,
+      onSave: _save,
+      children: [
+        TextField(controller: _title, decoration: formDecoration(tr('Tên Chủ đề'))),
+        formGap(),
+        TextField(controller: _icon, decoration: formDecoration(tr('Icon (Emoji)'))),
+        formGap(),
+        TextField(controller: _desc, maxLines: 2, decoration: formDecoration(tr('Mô tả'))),
+        formGap(),
+        DropdownButtonFormField<String>(
+          initialValue: _level,
+          decoration: formDecoration(tr('Cấp độ')),
+          items: cefrLevels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+          onChanged: (v) => setState(() => _level = v ?? _level),
+        ),
+        formGap(),
+        TextField(controller: _minutes, keyboardType: TextInputType.number, decoration: formDecoration(tr('Thời gian học (phút)'))),
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(tr('Hiển thị cho học viên')), value: _published, onChanged: (v) => setState(() => _published = v)),
+      ],
     );
   }
 }
 
-// 2. GRAMMAR FORM
+// ================= FORM NGỮ PHÁP (kèm ví dụ) =================
+class _ExampleDraft {
+  final TextEditingController sentence;
+  final TextEditingController translation;
+  final TextEditingController highlight;
+
+  _ExampleDraft({String sentence = '', String translation = '', String highlight = ''})
+      : sentence = TextEditingController(text: sentence),
+        translation = TextEditingController(text: translation),
+        highlight = TextEditingController(text: highlight);
+
+  void dispose() {
+    sentence.dispose();
+    translation.dispose();
+    highlight.dispose();
+  }
+}
+
 class GrammarFormScreen extends StatefulWidget {
-  final Grammar? existingGrammar;
-  const GrammarFormScreen({Key? key, this.existingGrammar}) : super(key: key);
+  final Grammar? existing;
+
+  const GrammarFormScreen({super.key, this.existing});
+
   @override
   State<GrammarFormScreen> createState() => _GrammarFormScreenState();
 }
+
 class _GrammarFormScreenState extends State<GrammarFormScreen> {
-  late TextEditingController titleCtrl, iconCtrl;
-  @override
-  void initState() {
-    super.initState();
-    titleCtrl = TextEditingController(text: widget.existingGrammar?.title ?? '');
-    iconCtrl = TextEditingController(text: widget.existingGrammar?.iconName ?? 'menu_book');
-  }
-  void _save() {
-    final newGrammar = Grammar(id: widget.existingGrammar?.id ?? DateTime.now().millisecondsSinceEpoch.toString(), title: titleCtrl.text, progress: widget.existingGrammar?.progress ?? 0.0, status: widget.existingGrammar?.status ?? 'Chưa học 0%', iconName: iconCtrl.text);
-    if (widget.existingGrammar == null) MockData.grammarTopics.add(newGrammar);
-    else MockData.grammarTopics[MockData.grammarTopics.indexWhere((g) => g.id == widget.existingGrammar!.id)] = newGrammar;
-    Navigator.pop(context);
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: Icon(Icons.close, ), onPressed: () => Navigator.pop(context)), title: Text(widget.existingGrammar == null ? 'Thêm Ngữ pháp' : 'Sửa Ngữ pháp', style: TextStyle())),
-      body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [Expanded(child: ListView(children: [TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tên Chủ điểm Ngữ pháp')), const SizedBox(height: 20), TextField(controller: iconCtrl, decoration: const InputDecoration(labelText: 'Tên Icon (VD: menu_book)'))])), SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 16)), onPressed: _save, child: Text('Xong (Done)', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold))))])),
-    );
-  }
-}
-
-// 3. QUIZ FORM
-class QuizFormScreen extends StatefulWidget {
-  final Map<String, dynamic>? existingQuiz;
-  // Truyền thêm hàm callback để cập nhật state ở màn hình trước
-  final Function(Map<String, dynamic>)? onSave;
-
-  const QuizFormScreen({Key? key, this.existingQuiz, this.onSave}) : super(key: key);
-  @override
-  State<QuizFormScreen> createState() => _QuizFormScreenState();
-}
-class _QuizFormScreenState extends State<QuizFormScreen> {
-  late TextEditingController titleCtrl, qtyCtrl, passCtrl;
+  final _title = TextEditingController();
+  final _desc = TextEditingController();
+  final _structure = TextEditingController();
+  final _content = TextEditingController();
+  final _usage = TextEditingController();
+  final _icon = TextEditingController(text: 'menu_book');
+  final _minutes = TextEditingController(text: '10');
+  String _level = 'A1';
+  bool _published = true;
+  final List<_ExampleDraft> _examples = [];
+  bool _loading = false;
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    titleCtrl = TextEditingController(text: widget.existingQuiz?['title'] ?? '');
-    qtyCtrl = TextEditingController(text: widget.existingQuiz?['questions']?.toString() ?? '10');
-    passCtrl = TextEditingController(text: widget.existingQuiz?['pass']?.toString().replaceAll('%', '') ?? '70');
+    if (widget.existing != null) _loadDetail();
   }
-  void _save() {
-    // Tạo object quiz mới
-    final newQuiz = {
-      'id': widget.existingQuiz?['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      'title': titleCtrl.text.trim(),
-      'questions': int.tryParse(qtyCtrl.text) ?? 10,
-      'pass': '${passCtrl.text.trim()}%'
-    };
 
-    // Gọi hàm callback nếu có
-    if (widget.onSave != null) {
-      widget.onSave!(newQuiz);
+  @override
+  void dispose() {
+    for (final c in [_title, _desc, _structure, _content, _usage, _icon, _minutes]) {
+      c.dispose();
     }
-
-    Navigator.pop(context);
+    for (final e in _examples) {
+      e.dispose();
+    }
+    super.dispose();
   }
+
+  Future<void> _loadDetail() async {
+    setState(() => _loading = true);
+    try {
+      final detail = await AdminRepository.grammarDetail(widget.existing!.id);
+      if (!mounted) return;
+      final s = detail.summary;
+      setState(() {
+        _title.text = s.title;
+        _desc.text = s.description;
+        _structure.text = s.structure;
+        _content.text = detail.content;
+        _usage.text = detail.usageNotes;
+        _icon.text = s.iconName;
+        _minutes.text = '${s.estimatedMinutes}';
+        _level = s.level;
+        _published = s.isPublished;
+        for (final ex in detail.examples) {
+          _examples.add(_ExampleDraft(sentence: ex.sentence, translation: ex.translation, highlight: ex.highlight));
+        }
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (_title.text.trim().isEmpty || _structure.text.trim().isEmpty || _icon.text.trim().isEmpty) {
+      showAppSnack(context, tr('Vui lòng nhập tên, cấu trúc và tên icon'), error: true);
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await AdminRepository.saveGrammar(widget.existing?.id, {
+        'title': _title.text.trim(),
+        'description': _desc.text.trim(),
+        'structure': _structure.text.trim(),
+        'content': _content.text.trim(),
+        'usageNotes': _usage.text.trim(),
+        'iconName': _icon.text.trim(),
+        'level': _level,
+        'estimatedMinutes': (int.tryParse(_minutes.text) ?? 10).clamp(1, 600),
+        'isPublished': _published,
+        'examples': [
+          for (final e in _examples)
+            if (e.sentence.text.trim().isNotEmpty)
+              {'sentence': e.sentence.text.trim(), 'translation': e.translation.text.trim(), 'highlight': e.highlight.text.trim()},
+        ],
+      });
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, errorMessage(e), error: true);
+      setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: Icon(Icons.close, ), onPressed: () => Navigator.pop(context)), title: Text(widget.existingQuiz == null ? 'Thêm Bài kiểm tra' : 'Sửa Bài kiểm tra', style: TextStyle())),
-      body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [Expanded(child: ListView(children: [TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Tên Bài kiểm tra')), const SizedBox(height: 20), TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Số lượng câu hỏi')), const SizedBox(height: 20), TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Tỷ lệ đậu (%)'))])), SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 16)), onPressed: _save, child: Text('Xong (Done)', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold))))])),
+    final title = widget.existing == null ? tr('Thêm Ngữ pháp') : tr('Sửa Ngữ pháp');
+    if (_loading) return Scaffold(appBar: AppBar(title: Text(title)), body: const LoadingView());
+    if (_error != null) return Scaffold(appBar: AppBar(title: Text(title)), body: ErrorView(message: _error!, onRetry: _loadDetail));
+    return AdminFormShell(
+      title: title,
+      saving: _saving,
+      onSave: _save,
+      children: [
+        TextField(controller: _title, decoration: formDecoration(tr('Tên Chủ điểm Ngữ pháp'))),
+        formGap(),
+        TextField(controller: _desc, maxLines: 2, decoration: formDecoration(tr('Mô tả ngắn'))),
+        formGap(),
+        TextField(controller: _structure, decoration: formDecoration(tr('Cấu trúc'), hint: 'S + am/is/are + V-ing')),
+        formGap(),
+        TextField(controller: _content, minLines: 4, maxLines: 10, decoration: formDecoration(tr('Giải thích chi tiết'))),
+        formGap(),
+        TextField(controller: _usage, minLines: 2, maxLines: 6, decoration: formDecoration(tr('Lưu ý'))),
+        formGap(),
+        TextField(controller: _icon, decoration: formDecoration(tr('Tên Icon (VD: menu_book)'))),
+        formGap(),
+        DropdownButtonFormField<String>(
+          initialValue: _level,
+          decoration: formDecoration(tr('Cấp độ')),
+          items: cefrLevels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+          onChanged: (v) => setState(() => _level = v ?? _level),
+        ),
+        formGap(),
+        TextField(controller: _minutes, keyboardType: TextInputType.number, decoration: formDecoration(tr('Thời gian học (phút)'))),
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(tr('Hiển thị cho học viên')), value: _published, onChanged: (v) => setState(() => _published = v)),
+        formGap(8),
+        Row(
+          children: [
+            Expanded(child: Text(tr('Ví dụ minh họa'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+            TextButton.icon(
+              onPressed: () => setState(() => _examples.add(_ExampleDraft())),
+              icon: const Icon(Icons.add),
+              label: Text(tr('Thêm ví dụ')),
+            ),
+          ],
+        ),
+        for (var i = 0; i < _examples.length; i++)
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  TextField(controller: _examples[i].sentence, decoration: formDecoration(tr('Câu tiếng Anh'))),
+                  formGap(10),
+                  TextField(controller: _examples[i].translation, decoration: formDecoration(tr('Dịch'))),
+                  formGap(10),
+                  TextField(controller: _examples[i].highlight, decoration: formDecoration(tr('Cụm cần tô đậm'))),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _examples.removeAt(i).dispose()),
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                      label: Text(tr('Xóa'), style: const TextStyle(color: Colors.red)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

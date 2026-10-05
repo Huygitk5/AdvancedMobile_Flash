@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Gọi REST API của backend (bản release cũng cần quyền này) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="flash"
         android:name="${applicationName}"
@@ -40,6 +42,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- flutter_tts: tìm engine đọc văn bản (Android 11+ cần khai báo package visibility) -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
         </intent>
     </queries>
 </manifest>

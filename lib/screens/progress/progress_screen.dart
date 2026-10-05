@@ -1,54 +1,111 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
-import 'dart:math';
-import '../../data/mock_data.dart';
+import '../../core/utils.dart';
+import '../../data/app_state.dart';
+import '../../data/progress_repository.dart';
 import '../../models/daily_statistic_model.dart';
+import '../../widgets/common.dart';
+import 'chart_data.dart';
+import 'line_chart.dart';
 
 class ProgressScreen extends StatefulWidget {
-  const ProgressScreen({Key? key}) : super(key: key);
+  const ProgressScreen({super.key});
 
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  // Thay đổi thứ tự theo yêu cầu
-  String selectedFilter = 'Tất cả';
-  final List<String> filters = ['Tất cả', 'Tuần', 'Tháng'];
+  StatsRange _range = StatsRange.week;
+  DateTimeRange? _customRange;
 
-  // Tạo dữ liệu giả lập cho Tháng và Tất cả để biểu đồ có thể thay đổi
-  late List<DailyStatistic> weekData;
-  late List<DailyStatistic> monthData;
-  late List<DailyStatistic> allData;
+  Statistics? _stats;
+  Statistics? _previous;
+  bool _loading = true;
+  String? _error;
+  int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
-    weekData = MockData.weeklyStats;
-
-    // Tạo 30 điểm dữ liệu cho Tháng
-    monthData = List.generate(30, (i) => DailyStatistic(
-      id: 'm$i', userId: 'u1', date: DateTime.now().subtract(Duration(days: 29 - i)),
-      wordsLearned: Random().nextInt(40) + 10, xpGained: 0,
-    ));
-
-    // Tạo 12 điểm dữ liệu cho Tất cả (tượng trưng cho 12 tháng)
-    allData = List.generate(12, (i) => DailyStatistic(
-      id: 'a$i', userId: 'u1', date: DateTime.now().subtract(Duration(days: (11 - i) * 30)),
-      wordsLearned: Random().nextInt(200) + 50, xpGained: 0,
-    ));
+    AppState.I.addListener(_onUserChanged);
+    _load();
   }
 
-  // Hàm lấy dữ liệu theo Filter
-  List<DailyStatistic> get currentChartData {
-    if (selectedFilter == 'Tuần') return weekData;
-    if (selectedFilter == 'Tháng') return monthData;
-    return allData;
+  @override
+  void dispose() {
+    AppState.I.removeListener(_onUserChanged);
+    super.dispose();
   }
 
-  // Hàm tính tổng từ vựng theo Filter để cập nhật con số to
-  int get totalWordsLearned {
-    return currentChartData.fold(0, (sum, item) => sum + item.wordsLearned);
+  void _onUserChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
+    final id = ++_requestId;
+    setState(() {
+      _loading = _stats == null;
+      _error = null;
+    });
+    try {
+      final stats = await ProgressRepository.statistics(_range, from: _customRange?.start, to: _customRange?.end);
+      Statistics? previous;
+      try {
+        previous = await ProgressRepository.previousPeriod(stats);
+      } catch (_) {
+        previous = null; // chỉ là phần so sánh, không làm hỏng cả màn hình
+      }
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _stats = stats;
+        _previous = previous;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _error = errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  void _select(StatsRange range) {
+    if (range == StatsRange.custom) {
+      _pickRange();
+      return;
+    }
+    setState(() {
+      _range = range;
+      _stats = null;
+    });
+    _load();
+  }
+
+  Future<void> _pickRange() async {
+    final today = dateOnly(DateTime.now());
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(today.year - 3),
+      lastDate: today,
+      initialDateRange: _customRange ?? DateTimeRange(start: today.subtract(const Duration(days: 29)), end: today),
+      locale: AppLocale.locale,
+      helpText: tr('Chọn khoảng ngày'),
+      saveText: tr('Áp dụng'),
+    );
+    if (picked == null || !mounted) return;
+    if (picked.end.difference(picked.start).inDays + 1 > 366) {
+      showAppSnack(context, tr('Khoảng ngày tối đa 366 ngày'), error: true);
+      return;
+    }
+    setState(() {
+      _customRange = DateTimeRange(start: dateOnly(picked.start), end: dateOnly(picked.end));
+      _range = StatsRange.custom;
+      _stats = null;
+    });
+    _load();
   }
 
   @override
@@ -56,31 +113,53 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        title: Text('Tiến độ', style: TextStyle( fontSize: 22, fontWeight: FontWeight.bold)),
-        centerTitle: false,
+        title: Text(tr('Tiến độ'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
-            children: [
-              _buildFilters(),
-              const SizedBox(height: 20),
-              _buildChartCard(),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(child: _buildCompletedLessonsCard()),
-                  const SizedBox(width: 15),
-                  Expanded(child: _buildStreakCard()),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await AppState.I.refreshAll();
+            await _load();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 100 + MediaQuery.of(context).padding.bottom),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFilters(),
+                if (_range == StatsRange.custom && _customRange != null) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text('${formatDate(_customRange!.start)} - ${formatDate(_customRange!.end)}',
+                        style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 15),
-              _buildAccuracyCard(),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 18),
+                if (_loading)
+                  const Padding(padding: EdgeInsets.only(top: 60), child: LoadingView())
+                else if (_stats == null)
+                  Padding(padding: const EdgeInsets.only(top: 40), child: ErrorView(message: _error ?? '', onRetry: _load))
+                else ...[
+                  _buildChartCard(_stats!),
+                  const SizedBox(height: 15),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _buildCompletedLessonsCard()),
+                        const SizedBox(width: 15),
+                        Expanded(child: _buildStreakCard(_stats!)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  _buildAccuracyCard(_stats!),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -88,202 +167,189 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildFilters() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: filters.map((filter) {
-        bool isActive = selectedFilter == filter;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => selectedFilter = filter),
-            child: Container(
-              margin: EdgeInsets.only(right: filter != 'Tháng' ? 10 : 0),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: isActive ? AppTheme.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isActive ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5)],
-              ),
-              child: Center(
-                child: Text(
-                  filter,
-                  style: TextStyle(color: isActive ? Colors.white : AppTheme.greyColor, fontWeight: FontWeight.bold),
+    final items = <(StatsRange, String)>[
+      (StatsRange.week, tr('Tuần')),
+      (StatsRange.month, tr('Tháng')),
+      (StatsRange.year, tr('Năm')),
+      (StatsRange.all, tr('Tất cả')),
+      (StatsRange.custom, tr('Tùy chọn')),
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => _select(item.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: _range == item.$1 ? AppTheme.primaryColor : Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: _range == item.$1 ? null : Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (item.$1 == StatsRange.custom) ...[
+                        Icon(Icons.date_range, size: 16, color: _range == item.$1 ? Colors.white : AppTheme.greyColor),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(item.$2,
+                          style: TextStyle(color: _range == item.$1 ? Colors.white : AppTheme.greyColor, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 
-  Widget _buildChartCard() {
+  Widget _card(Widget child, {EdgeInsets padding = const EdgeInsets.all(20)}) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: padding,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
       ),
-      child: Column(
+      child: child,
+    );
+  }
+
+  Widget _buildChartCard(Statistics stats) {
+    final points = buildChartPoints(_range, stats);
+    final total = points.fold<int>(0, (sum, p) => sum + p.value);
+    final delta = _previous == null ? null : total - _previous!.wordsLearned;
+    return _card(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Số từ đã học', style: TextStyle( fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(tr('Số từ đã học'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Hiển thị số động theo bộ lọc
-              Text('$totalWordsLearned', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, )),
+              Text('$total', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
               const SizedBox(width: 10),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Text('+12 từ so với kỳ trước', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 12)),
-              ),
+              if (delta != null)
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      delta >= 0
+                          ? trf('+{n} từ so với kỳ trước', {'n': delta})
+                          : trf('{n} từ so với kỳ trước', {'n': delta}),
+                      maxLines: 2,
+                      style: TextStyle(color: delta >= 0 ? Colors.green : Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 30),
-          SizedBox(
-            height: 120, width: double.infinity,
-            child: CustomPaint(
-              painter: LineChartPainter(stats: currentChartData), // Truyền dữ liệu động
-            ),
-          ),
-          const SizedBox(height: 10),
-          _buildChartXLabels(),
+          const SizedBox(height: 18),
+          if (points.every((p) => p.value == 0))
+            SizedBox(
+              height: 150,
+              child: Center(
+                child: Text(tr('Chưa có từ nào được học trong khoảng này'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+              ),
+            )
+          else
+            WordsLineChart(points: points),
         ],
       ),
-    );
-  }
-
-  Widget _buildChartXLabels() {
-    List<String> labels = [];
-    if (selectedFilter == 'Tuần') labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    else if (selectedFilter == 'Tháng') labels = ['1', '10', '20', '30'];
-    else labels = ['T1', 'T4', 'T8', 'T12']; // Tất cả
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: labels.map((l) => Text(l, style: TextStyle(color: AppTheme.greyColor, fontSize: 12))).toList(),
     );
   }
 
   Widget _buildCompletedLessonsCard() {
-    final user = MockData.currentUser;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]),
-      child: Column(
+    final user = AppState.I.user;
+    return _card(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.menu_book, color: AppTheme.primaryColor, size: 20)), const SizedBox(width: 8), const Expanded(child: Text('Bài học hoàn thành', style: TextStyle(color: AppTheme.greyColor, fontSize: 11)))]),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.menu_book, color: AppTheme.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tr('Bài học hoàn thành'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 11))),
+          ]),
           const SizedBox(height: 15),
           RichText(
             text: TextSpan(
-              style: TextStyle(fontFamily: 'Roboto'),
+              style: TextStyle(fontFamily: 'Roboto', color: Theme.of(context).textTheme.bodyLarge?.color),
               children: [
-                TextSpan(text: '${user.completedLessons} ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
-                TextSpan(text: 'bài', style: TextStyle(fontSize: 16, color: AppTheme.greyColor, fontWeight: FontWeight.w600)),
+                TextSpan(
+                    text: '${user?.completedLessons ?? 0} ',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                TextSpan(text: tr('bài'), style: const TextStyle(fontSize: 16, color: AppTheme.greyColor, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(16),
     );
   }
 
-  Widget _buildStreakCard() {
-    final user = MockData.currentUser;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]),
-      child: Column(
+  Widget _buildStreakCard(Statistics stats) {
+    return _card(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: const [Icon(Icons.local_fire_department, color: Colors.orange, size: 28), SizedBox(width: 8), Expanded(child: Text('Streak hiện tại', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)))]),
+          Row(children: [
+            const Icon(Icons.local_fire_department, color: Colors.orange, size: 28),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tr('Streak hiện tại'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12))),
+          ]),
           const SizedBox(height: 15),
           RichText(
             text: TextSpan(
-              style: TextStyle(fontFamily: 'Roboto'),
+              style: TextStyle(fontFamily: 'Roboto', color: Theme.of(context).textTheme.bodyLarge?.color),
               children: [
-                TextSpan(text: '${user.streakDays} ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent)),
-                TextSpan(text: 'ngày', style: TextStyle(fontSize: 16,  fontWeight: FontWeight.w600)),
+                TextSpan(text: '${stats.streakDays} ', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                TextSpan(text: tr('ngày'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(16),
     );
   }
 
-  Widget _buildAccuracyCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]),
-      child: Row(
+  Widget _buildAccuracyCard(Statistics stats) {
+    final percent = (stats.accuracy * 100).round();
+    return _card(
+      Row(
         children: [
           SizedBox(
-            width: 60, height: 60,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [CircularProgressIndicator(value: 0.85, strokeWidth: 8, backgroundColor: Colors.green.shade50, color: Colors.green.shade400)],
-            ),
+            width: 60,
+            height: 60,
+            child: CircularProgressIndicator(
+                value: stats.accuracy.clamp(0.0, 1.0), strokeWidth: 8, backgroundColor: Colors.green.shade50, color: Colors.green.shade400),
           ),
           const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Độ chính xác (Quiz)', style: TextStyle(color: AppTheme.greyColor, fontSize: 13)),
-              SizedBox(height: 5),
-              Text('85%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, )),
-            ],
-          )
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('Độ chính xác (Quiz)'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                const SizedBox(height: 5),
+                Text('$percent%', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-}
-
-class LineChartPainter extends CustomPainter {
-  final List<DailyStatistic> stats;
-  LineChartPainter({required this.stats});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (stats.isEmpty) return;
-    final paintLine = Paint()..color = AppTheme.primaryColor..strokeWidth = 3..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
-    int maxWords = stats.map((s) => s.wordsLearned).fold(0, (prev, amount) => max(prev, amount));
-    if (maxWords == 0) maxWords = 1;
-
-    List<Offset> points = [];
-    for (int i = 0; i < stats.length; i++) {
-      double x = i * (size.width / (stats.length - 1));
-      double y = size.height - (stats[i].wordsLearned / maxWords) * (size.height * 0.8);
-      points.add(Offset(x, y));
-    }
-
-    final path = Path();
-    path.moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) path.lineTo(points[i].dx, points[i].dy);
-
-    final fillPath = Path.from(path)..lineTo(size.width, size.height)..lineTo(0, size.height)..close();
-    final gradientPaint = Paint()
-      ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppTheme.primaryColor.withOpacity(0.3), AppTheme.primaryColor.withOpacity(0.0)])
-          .createShader(Rect.fromLTRB(0, 0, size.width, size.height));
-
-    canvas.drawPath(fillPath, gradientPaint);
-    canvas.drawPath(path, paintLine);
-
-    final dotPaint = Paint()..color = AppTheme.primaryColor..style = PaintingStyle.fill;
-    final dotBgPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
-
-    // Chỉ vẽ chấm tròn nếu số điểm ít (Tuần hoặc Tất cả) để tránh rối mắt cho Tháng
-    if (stats.length <= 12) {
-      for (var point in points) {
-        canvas.drawCircle(point, 5, dotBgPaint);
-        canvas.drawCircle(point, 3, dotPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

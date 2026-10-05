@@ -25,6 +25,10 @@ public class PasswordResetToken {
     @Column(columnDefinition = "char", nullable = false)
     private UUID userId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "enum", nullable = false)
+    private OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
+
     @Column(columnDefinition = "char", nullable = false)
     private String tokenHash;
 

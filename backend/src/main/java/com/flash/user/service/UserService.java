@@ -151,9 +151,9 @@ public class UserService {
     // ------------------------------------------------------------------ admin
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> search(String keyword, UserStatus status, Pageable pageable) {
+    public Page<UserResponse> search(String keyword, UserStatus status, UserRole role, Pageable pageable) {
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
-        return userRepository.search(normalizedKeyword, status, pageable).map(UserResponse::from);
+        return userRepository.search(normalizedKeyword, status, role, pageable).map(UserResponse::from);
     }
 
     @Transactional

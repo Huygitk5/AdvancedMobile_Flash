@@ -7,7 +7,9 @@ import com.flash.auth.dto.LoginRequest;
 import com.flash.auth.dto.LogoutRequest;
 import com.flash.auth.dto.RefreshTokenRequest;
 import com.flash.auth.dto.RegisterRequest;
+import com.flash.auth.dto.ResendVerificationRequest;
 import com.flash.auth.dto.ResetPasswordRequest;
+import com.flash.auth.dto.VerifyEmailRequest;
 import com.flash.auth.service.AuthService;
 import com.flash.auth.service.PasswordResetService;
 import com.flash.common.ApiResponse;
@@ -36,12 +38,30 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
 
-    @Operation(summary = "Đăng ký bằng email/mật khẩu")
+    @Operation(summary = "Đăng ký bằng email/mật khẩu",
+            description = "Khi bật xác thực email: trả verificationRequired = true (chưa có token) và gửi OTP tới email, "
+                    + "client gọi tiếp POST /v1/auth/verify-email")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
                                               @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        return ApiResponse.ok(authService.register(request, userAgent), "Đăng ký thành công");
+        AuthResponse response = authService.register(request, userAgent);
+        return ApiResponse.ok(response, response.isVerificationRequired()
+                ? "Vui lòng nhập mã OTP đã gửi tới email để hoàn tất đăng ký" : "Đăng ký thành công");
+    }
+
+    @Operation(summary = "Xác thực email bằng OTP", description = "Đúng OTP thì kích hoạt tài khoản và đăng nhập luôn")
+    @PostMapping("/verify-email")
+    public ApiResponse<AuthResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request,
+                                                 @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+        return ApiResponse.ok(authService.verifyEmail(request, userAgent), "Xác thực email thành công");
+    }
+
+    @Operation(summary = "Gửi lại OTP xác thực email", description = "Luôn trả 200 dù email có tồn tại hay không")
+    @PostMapping("/resend-verification")
+    public ApiResponse<Void> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request.getEmail());
+        return ApiResponse.ok(null, "Nếu email đang chờ xác thực, mã OTP mới sẽ được gửi tới hộp thư của bạn");
     }
 
     @Operation(summary = "Đăng nhập bằng email/mật khẩu")
