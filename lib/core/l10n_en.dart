@@ -233,7 +233,11 @@ const Map<String, String> enTranslations = {
   'Từ đã lưu': 'Saved words',
   'Từ đã lưu ({n})': 'Saved words ({n})',
   'Xem tất cả': 'View all',
-  'Chưa có từ nào được lưu. Bấm biểu tượng dấu trang trên thẻ từ vựng để lưu.': 'No saved words yet. Tap the bookmark icon on a flashcard to save it.',
+  'Tìm từ hoặc nghĩa...': 'Search word or meaning...',
+  'Xóa tìm kiếm': 'Clear search',
+  'Không tìm thấy từ đã lưu phù hợp': 'No matching saved words found',
+  'Chưa có từ nào được lưu. Bấm biểu tượng dấu trang trên thẻ từ vựng để lưu.':
+      'No saved words yet. Tap the bookmark icon on a flashcard to save it.',
   'Chưa có từ nào được lưu': 'No saved words yet',
   'Bỏ lưu': 'Unsave',
 

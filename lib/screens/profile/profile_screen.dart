@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/icons.dart';
 import '../../core/l10n.dart';
 import '../../core/speech.dart';
 import '../../core/theme.dart';
 import '../../models/flashcard_model.dart';
 import '../../models/reward_item_model.dart';
+import '../../models/saved_word_topic_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/content_providers.dart';
 import '../../providers/providers.dart';
@@ -264,10 +266,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  /// Danh sách từ đã lưu (xem trước 5 từ), bấm "Xem tất cả" để mở đầy đủ.
+  /// Các topic có từ đã lưu, bấm "Xem tất cả" để mở đầy đủ và lọc/tìm kiếm.
   Widget _buildSavedWords(BuildContext context) {
-    final savedAsync = ref.watch(bookmarkedCardsProvider);
-    final saved = savedAsync.value ?? const <Flashcard>[];
+    final topicsAsync = ref.watch(savedWordTopicsProvider);
+    final topics = topicsAsync.value ?? const <SavedWordTopic>[];
+    final total = topics.fold<int>(0, (sum, topic) => sum + topic.wordCount);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -283,10 +286,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const Icon(Icons.bookmark, color: Colors.amber),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(trf('Từ đã lưu ({n})', {'n': saved.length}),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: Text(
+                  trf('Từ đã lưu ({n})', {'n': total}),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
               ),
-              if (saved.isNotEmpty)
+              if (topics.isNotEmpty)
                 TextButton(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedWordsScreen())),
                   child: Text(tr('Xem tất cả'), style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -294,39 +302,72 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          if (savedAsync.isLoading && saved.isEmpty)
-            const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
-          else if (saved.isEmpty)
+          if (topicsAsync.isLoading && topics.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (topics.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Text(tr('Chưa có từ nào được lưu. Bấm biểu tượng dấu trang trên thẻ từ vựng để lưu.'),
                   style: const TextStyle(color: AppTheme.greyColor, fontSize: 13, height: 1.4)),
             )
           else
-            for (final word in saved.take(5))
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(word.word, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          Text(word.meaning,
-                              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.volume_up, color: AppTheme.primaryColor, size: 22),
-                      onPressed: () => SpeechService.speak(word.word),
-                    ),
-                  ],
+            ...topics.take(5).map((topic) => _savedTopicRow(context, topic)),
+        ],
+      ),
+    );
+  }
+
+  Widget _savedTopicRow(BuildContext context, SavedWordTopic topic) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SavedWordsScreen(initialTopicId: topic.topicId),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: isIconName(topic.iconPath)
+                  ? Icon(
+                      iconFor(topic.iconPath),
+                      color: AppTheme.primaryColor,
+                      size: 19,
+                    )
+                  : Text(topic.iconPath, style: const TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                topic.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
               ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              trf('{n} từ', {'n': topic.wordCount}),
+              style: const TextStyle(color: AppTheme.greyColor, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }
