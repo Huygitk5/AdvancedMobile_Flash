@@ -5,8 +5,8 @@ import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../models/admin_models.dart';
-import '../../providers/auth_providers.dart';
 import '../../providers/providers.dart';
+import '../profile/settings_screen.dart';
 import 'admin_common.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -33,16 +33,15 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text(tr('Tổng quan hệ thống'), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        title: Text(tr('Tổng quan hệ thống'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(tooltip: tr('Làm mới'), icon: const Icon(Icons.refresh, color: Colors.white), onPressed: _load),
+          IconButton(tooltip: tr('Làm mới'), icon: const Icon(Icons.refresh), onPressed: _load),
           IconButton(
-            tooltip: tr('Đăng xuất'),
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => ref.read(authStateProvider.notifier).logout(),
+            tooltip: tr('Cài đặt'),
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
