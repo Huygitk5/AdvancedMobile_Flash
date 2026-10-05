@@ -7,7 +7,7 @@ class Env {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.101.28:8080',
+    defaultValue: 'https://flash.devflux.io.vn',
   );
 
   /// OAuth client id loại **Web** (Google Cloud) để Android nhận được `idToken` cho `/v1/auth/google`.
@@ -15,6 +15,6 @@ class Env {
   /// Client ID không phải bí mật nên đặt sẵn giá trị mặc định; vẫn ghi đè được bằng --dart-define.
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '887843851502-bqhkmojl022pbhob1hgeerk8ejaj5tcj.apps.googleusercontent.com',
+    defaultValue: '887843851502-kmi9207u754srhvfgadfacr1v9ec7bgn.apps.googleusercontent.com',
   );
 }

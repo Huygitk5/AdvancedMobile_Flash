@@ -16,7 +16,6 @@ import 'admin_quiz_questions_screen.dart';
 
 typedef _Content = ({List<Topic> topics, List<Grammar> grammars, List<Quiz> quizzes});
 
-/// Lấy hết các trang của một danh sách phân trang (tối đa [maxPages] trang).
 Future<List<T>> _allPages<T>(Future<({List<T> items, int totalPages})> Function(int page) fetch, {int maxPages = 5}) async {
   final all = <T>[];
   for (var page = 0; page < maxPages; page++) {
@@ -37,7 +36,6 @@ Future<List<Grammar>> _allGrammar(WidgetRef ref) => _allPages((p) async {
       return (items: r.items, totalPages: r.totalPages);
     });
 
-/// Thay đổi ở đây tới app người học qua `/v1/sync/content` ở lần pull sau.
 class AdminContentScreen extends ConsumerStatefulWidget {
   const AdminContentScreen({super.key});
 
@@ -71,7 +69,7 @@ class _AdminContentScreenState extends ConsumerState<AdminContentScreen> {
 
   Future<void> _openDetail(Widget screen) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
-    _loadData(); // số từ / câu hỏi có thể đã đổi
+    _loadData();
   }
 
   Future<void> _delete(String what, Future<void> Function() call, String success) async {
@@ -127,9 +125,13 @@ class _AdminContentScreenState extends ConsumerState<AdminContentScreen> {
         },
         child: items.isEmpty
             ? ListView(children: [SizedBox(height: 260, child: EmptyView(message: tr('Không có dữ liệu'), icon: Icons.inbox_outlined))])
-            : ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 90), children: items),
+            : ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 140), children: items),
       ),
-      floatingActionButton: FloatingActionButton(backgroundColor: fabColor, onPressed: onAdd, child: const Icon(Icons.add, color: Colors.white)),
+      // Đẩy FAB lên cao 95px để lơ lửng hơn hẳn
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 95),
+        child: FloatingActionButton(backgroundColor: fabColor, onPressed: onAdd, child: const Icon(Icons.add, color: Colors.white)),
+      ),
     );
   }
 
@@ -210,7 +212,6 @@ class _AdminContentScreenState extends ConsumerState<AdminContentScreen> {
             ),
             onEdit: () => _openForm(GrammarFormScreen(existing: g)),
             onDelete: () => _delete(g.title, () => ref.read(adminApiProvider).deleteGrammar(g.id), tr('Đã xóa chủ điểm!')),
-            // Chạm: màn chi tiết sửa cấu trúc / giải thích / từng câu ví dụ
             onTap: () => _openDetail(AdminGrammarExamplesScreen(grammarId: g.id, grammarTitle: g.title)),
           ),
       ],
@@ -234,15 +235,12 @@ class _AdminContentScreenState extends ConsumerState<AdminContentScreen> {
             ),
             onEdit: () => _openForm(QuizFormScreen(existing: q, topics: c.topics, grammars: c.grammars)),
             onDelete: () => _delete(q.title, () => ref.read(adminApiProvider).deleteQuiz(q.id), tr('Đã xóa bài kiểm tra!')),
-            // Chạm: màn danh sách câu hỏi của đề
             onTap: () => _openDetail(AdminQuizQuestionsScreen(quizId: q.id, quizTitle: q.title)),
           ),
       ],
     );
   }
 }
-
-// ================= CÁC FORM FULL MÀN HÌNH =================
 
 Widget _levelDropdown(String value, ValueChanged<String> onChanged) => DropdownButtonFormField<String>(
       initialValue: cefrLevels.contains(value) ? value : 'A1',
@@ -261,7 +259,6 @@ Widget _publishedSwitch(bool value, ValueChanged<bool> onChanged) => SwitchListT
 
 int _minutes(TextEditingController c) => (parseIntOrNull(c.text) ?? 10).clamp(1, 600);
 
-// 1. TOPIC FORM
 class TopicFormScreen extends ConsumerStatefulWidget {
   final Topic? existing;
 
@@ -295,7 +292,6 @@ class _TopicFormScreenState extends ConsumerState<TopicFormScreen> {
       return;
     }
     final api = ref.read(adminApiProvider);
-    // Server thay toàn bộ: gửi đủ mọi field (kể cả coverColor cũ).
     final body = {
       'title': _title.text.trim(),
       'description': _desc.text.trim().isEmpty ? null : _desc.text.trim(),
@@ -339,7 +335,6 @@ class _TopicFormScreenState extends ConsumerState<TopicFormScreen> {
   }
 }
 
-// 2. GRAMMAR FORM (kèm giải thích, lưu ý và ví dụ)
 class _ExampleDraft {
   final TextEditingController sentence;
   final TextEditingController translation;
@@ -399,7 +394,6 @@ class _GrammarFormScreenState extends ConsumerState<GrammarFormScreen> {
     super.dispose();
   }
 
-  /// Update thay TOÀN BỘ (kể cả ví dụ): nạp bản chi tiết để giữ content / usageNotes / examples.
   Future<void> _loadDetail() async {
     final detail = await ref.read(adminApiProvider).grammarDetail(widget.existing!.id);
     if (!mounted) return;
@@ -544,7 +538,6 @@ class _GrammarFormScreenState extends ConsumerState<GrammarFormScreen> {
   }
 }
 
-// 3. QUIZ FORM (soạn luôn câu hỏi; chạm vào quiz ở danh sách để sửa riêng từng câu)
 class QuizFormScreen extends ConsumerStatefulWidget {
   final Quiz? existing;
   final List<Topic> topics;
@@ -582,7 +575,6 @@ class _QuizFormScreenState extends ConsumerState<QuizFormScreen> {
     super.dispose();
   }
 
-  /// Update thay TOÀN BỘ câu hỏi: nạp danh sách hiện có để gửi lại.
   Future<void> _loadQuestions() async {
     final detail = await ref.read(adminApiProvider).quizDetail(widget.existing!.id);
     if (mounted) setState(() => _questions = List.of(detail.questions));
