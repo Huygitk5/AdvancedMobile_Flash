@@ -20,8 +20,7 @@ class AppConfig {
 
   static String get defaultBaseUrl => Env.apiBaseUrl;
 
-  // static String get apiBaseUrl => (_override != null && _override!.isNotEmpty) ? _override! : defaultBaseUrl;
-  static String get apiBaseUrl => defaultBaseUrl;
+  static String get apiBaseUrl => (_override != null && _override!.isNotEmpty) ? _override! : defaultBaseUrl;
 
   /// Lưu địa chỉ backend do người dùng nhập; chuỗi rỗng = quay lại mặc định.
   static Future<void> setApiBaseUrl(String? url) async {
