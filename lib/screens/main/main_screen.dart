@@ -39,7 +39,7 @@ class _MainScreenState extends State<MainScreen> {
 
   static const List<_NavData> _navItems = [
     _NavData(Icons.home_filled, 'Trang chủ', Color(0xFF3366FF)),
-    _NavData(Icons.menu_book, 'Học', Color(0xFF2FBF71)),
+    _NavData(Icons.menu_book, 'Học tập', Color(0xFF2FBF71)),
     _NavData(Icons.bar_chart, 'Tiến độ', Color(0xFF8B5CF6)),
     _NavData(Icons.emoji_events_outlined, 'Thử thách', Color(0xFFFF9F1C)),
     _NavData(Icons.person_outline, 'Cá nhân', Color(0xFFFF5C7A)),
