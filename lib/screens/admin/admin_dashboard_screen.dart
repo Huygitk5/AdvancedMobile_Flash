@@ -68,6 +68,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GridView.count(
+            padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 20.0),
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
             crossAxisCount: 2,
@@ -85,10 +86,10 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   footer: trf('{n} quản trị viên', {'n': o.admins})),
             ],
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 5),
           Text(tr('Học viên mới đăng ký'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
-          const SizedBox(height: 15),
+          const SizedBox(height: 5),
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,

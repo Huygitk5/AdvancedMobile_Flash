@@ -112,17 +112,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20)),
                   child: Column(
                     children: [
-                      _buildSwitchTile(Icons.notifications_outlined, tr('Thông báo nhắc học'), prefs.isNotificationEnabled,
-                          (val) => _update(() => repo.setNotification(val), () => val ? tr('Đã bật thông báo') : tr('Đã tắt thông báo'))),
-                      _buildDivider(),
-                      _buildListTile(Icons.alarm, tr('Giờ nhắc học'), trailingText: prefs.dailyReminderTime, onTap: _pickReminderTime),
-                      _buildDivider(),
+                      // _buildSwitchTile(Icons.notifications_outlined, tr('Thông báo nhắc học'), prefs.isNotificationEnabled,
+                      //     (val) => _update(() => repo.setNotification(val), () => val ? tr('Đã bật thông báo') : tr('Đã tắt thông báo'))),
+                      // _buildDivider(),
+                      // _buildListTile(Icons.alarm, tr('Giờ nhắc học'), trailingText: prefs.dailyReminderTime, onTap: _pickReminderTime),
+                      // _buildDivider(),
                       _buildSwitchTile(Icons.volume_up_outlined, tr('Âm thanh ứng dụng'), prefs.isSoundEnabled,
                           (val) => _update(() => repo.setSound(val), () => val ? tr('Đã bật âm thanh') : tr('Đã tắt âm thanh'))),
                       _buildDivider(),
-                      _buildSwitchTile(Icons.vibration, tr('Rung'), prefs.isVibrationEnabled,
-                          (val) => _update(() => repo.setVibration(val), () => val ? tr('Đã bật rung') : tr('Đã tắt rung'))),
-                      _buildDivider(),
+                      // _buildSwitchTile(Icons.vibration, tr('Rung'), prefs.isVibrationEnabled,
+                      //     (val) => _update(() => repo.setVibration(val), () => val ? tr('Đã bật rung') : tr('Đã tắt rung'))),
+                      // _buildDivider(),
                       _buildSwitchTile(Icons.dark_mode_outlined, tr('Chế độ tối (Dark Mode)'), prefs.isDarkMode,
                           (val) => _update(() => repo.setDarkMode(val), () => val ? tr('Đã bật chế độ tối') : tr('Đã tắt chế độ tối'))),
                       _buildDivider(),
@@ -131,12 +131,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildDivider(),
                       _buildListTile(Icons.lock_outline, tr('Đổi mật khẩu'),
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
-                      _buildDivider(),
-                      _buildListTile(Icons.dns_outlined, tr('Địa chỉ máy chủ'),
-                          trailingText: Uri.tryParse(AppConfig.apiBaseUrl)?.host ?? '', onTap: () async {
-                        await ServerSettingsDialog.show(context, ref);
-                        if (mounted) setState(() {});
-                      }),
+                      // _buildDivider(),
+                      // _buildListTile(Icons.dns_outlined, tr('Địa chỉ máy chủ'),
+                      //     trailingText: Uri.tryParse(AppConfig.apiBaseUrl)?.host ?? '', onTap: () async {
+                      //   await ServerSettingsDialog.show(context, ref);
+                      //   if (mounted) setState(() {});
+                      // }),
                     ],
                   ),
                 ),
