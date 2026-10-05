@@ -50,7 +50,9 @@ class SrsRepository extends WriteRepository {
       );
 
       await recordActivity(at);
-      await db.statsDao.bump(localDateKey(at), cardsReviewed: 1, wordsLearned: becameLearned ? 1 : 0, xpGained: xp);
+      // Chỉ tính "từ mới học" ở lần Know đầu tiên của thẻ; Know -> Again -> Know không đếm lại (giống server)
+      final newWord = becameLearned && state.knowCount == 1;
+      await db.statsDao.bump(localDateKey(at), cardsReviewed: 1, wordsLearned: newWord ? 1 : 0, xpGained: xp);
       await db.profileDao.addPendingXp(xp);
       if (wasLearned != state.isLearned) await db.profileDao.setTotalWordsLearned(await srs.learnedTotal());
       await db.questDao.bump('REVIEW_CARDS', 1, at);
@@ -123,7 +125,7 @@ class NoteRepository extends WriteRepository {
   }
 }
 
-/// Nút bookmark ở VocabularyBottomSheet -> BOOKMARK_SET.
+/// Nút lưu từ trên thẻ (FlashcardScreen) / màn Từ đã lưu -> BOOKMARK_SET.
 class BookmarkRepository extends WriteRepository {
   BookmarkRepository(super.db, super.kick);
 
@@ -171,8 +173,15 @@ class LessonRepository extends WriteRepository {
     var xp = 0;
     await db.transaction(() async {
       final (dayStart, dayEnd) = WriteRepository.dayBounds(at);
-      xp = XpEstimator.lesson(lessonsBeforeToday: await db.lessonDao.countBetween(dayStart, dayEnd));
-      await db.lessonDao.insert(
+      final lessonDao = db.lessonDao;
+      // "Bài học hoàn thành" đếm số bài khác nhau: học lại một bài đã xong chỉ ghi nhận lượt học (giống server)
+      final firstCompletion = !await lessonDao.existsFor(topicId: topicId, grammarLessonId: grammarLessonId);
+      xp = XpEstimator.lesson(
+        lessonsBeforeToday: await lessonDao.countBetween(dayStart, dayEnd),
+        sameLessonToday:
+            await lessonDao.existsFor(topicId: topicId, grammarLessonId: grammarLessonId, fromMs: dayStart, toMs: dayEnd),
+      );
+      await lessonDao.insert(
         id: id,
         lessonType: type,
         topicId: topicId,
@@ -183,7 +192,7 @@ class LessonRepository extends WriteRepository {
       );
       await recordActivity(at);
       await db.statsDao.bump(localDateKey(at), lessonsCompleted: 1, xpGained: xp, studySeconds: duration);
-      await db.profileDao.bumpCounters(completedLessons: 1);
+      if (firstCompletion) await db.profileDao.bumpCounters(completedLessons: 1);
       await db.profileDao.addPendingXp(xp);
       await db.questDao.bump('COMPLETE_LESSON', 1, at);
       await db.questDao.bump('STUDY_MINUTES', duration ~/ 60, at);

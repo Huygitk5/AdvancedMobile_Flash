@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../models/grammar_model.dart';
 import '../../providers/providers.dart';
@@ -79,7 +80,7 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
           'sortOrder': g.sortOrder,
           'isPublished': g.isPublished,
           'examples': grammarExamplesBody(examples),
-        }), success: 'Đã lưu chủ điểm');
+        }), success: tr('Đã lưu chủ điểm'));
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) _load();
@@ -93,18 +94,18 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cấu trúc & Giải thích', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(tr('Cấu trúc & Giải thích'), style: const TextStyle(fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: structureCtrl, decoration: adminInputDeco('Công thức')),
+            TextField(controller: structureCtrl, decoration: adminInputDeco(context, tr('Công thức'))),
             const SizedBox(height: 10),
-            TextField(controller: contentCtrl, maxLines: 4, decoration: adminInputDeco('Giải thích')),
+            TextField(controller: contentCtrl, maxLines: 4, decoration: adminInputDeco(context, tr('Giải thích'))),
             const SizedBox(height: 10),
-            TextField(controller: notesCtrl, maxLines: 3, decoration: adminInputDeco('Lưu ý khi dùng')),
+            TextField(controller: notesCtrl, maxLines: 3, decoration: adminInputDeco(context, tr('Lưu ý khi dùng'))),
           ]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
             onPressed: () {
@@ -116,7 +117,7 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
               });
               Navigator.pop(dialogContext);
             },
-            child: Text('Xong', style: TextStyle(color: Theme.of(dialogContext).cardColor)),
+            child: Text(tr('Xong'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -132,21 +133,21 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(existingExample == null ? 'Thêm Ví dụ' : 'Sửa Ví dụ', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(existingExample == null ? tr('Thêm Ví dụ') : tr('Sửa Ví dụ'), style: const TextStyle(fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: sentenceController, decoration: adminInputDeco('Câu tiếng Anh')),
+              TextField(controller: sentenceController, decoration: adminInputDeco(context, tr('Câu tiếng Anh'))),
               const SizedBox(height: 10),
-              TextField(controller: transController, decoration: adminInputDeco('Nghĩa tiếng Việt')),
+              TextField(controller: transController, decoration: adminInputDeco(context, tr('Nghĩa tiếng Việt'))),
               const SizedBox(height: 10),
-              TextField(controller: highlightController, decoration: adminInputDeco('Cụm từ cần in đậm (VD: am learning)')),
+              TextField(controller: highlightController, decoration: adminInputDeco(context, tr('Cụm từ cần in đậm (VD: am learning)'))),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy', style: TextStyle(color: AppTheme.greyColor))),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
             onPressed: () {
@@ -167,7 +168,7 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
               });
               Navigator.pop(dialogContext);
             },
-            child: Text('Xong', style: TextStyle(color: Theme.of(dialogContext).cardColor)),
+            child: Text(tr('Xong'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -180,14 +181,14 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context)),
-        title: Text('Ngữ pháp: ${widget.grammarTitle}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text(trf('Ngữ pháp: {t}', {'t': widget.grammarTitle}), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         actions: [
           TextButton.icon(
             onPressed: _dirty && !_saving ? _save : null,
             icon: _saving
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save_outlined),
-            label: const Text('Lưu'),
+            label: Text(tr('Lưu')),
           ),
         ],
       ),
@@ -202,7 +203,7 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
                 margin: const EdgeInsets.only(bottom: 15),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(12)),
-                child: const Text('Có thay đổi chưa lưu. Bấm "Lưu" để gửi toàn bộ lên server.', style: TextStyle(fontSize: 13)),
+                child: Text(tr('Có thay đổi chưa lưu. Bấm "Lưu" để gửi toàn bộ lên server.'), style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
               ),
             Card(
               elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -214,19 +215,19 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Cấu trúc & Giải thích', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(tr('Cấu trúc & Giải thích'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         IconButton(icon: const Icon(Icons.edit, color: Colors.amber, size: 20), onPressed: _showStructureDialog),
                       ],
                     ),
                     const Divider(),
-                    const Text('Công thức:', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                    Text(tr('Công thức:'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                     Text(structure, style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
-                    const Text('Giải thích:', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                    Text(content.isEmpty ? '(chưa có)' : content, style: const TextStyle(fontSize: 14)),
+                    Text(tr('Giải thích:'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                    Text(content.isEmpty ? tr('(chưa có)') : content, style: const TextStyle(fontSize: 14)),
                     if (usageNotes.isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      const Text('Lưu ý:', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
+                      Text(tr('Lưu ý:'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
                       Text(usageNotes, style: const TextStyle(fontSize: 14)),
                     ],
                   ],
@@ -234,7 +235,7 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Danh sách Câu ví dụ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(tr('Danh sách Câu ví dụ'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
 
             ...List.generate(examples.length, (index) {
@@ -275,8 +276,8 @@ class _AdminGrammarExamplesScreenState extends ConsumerState<AdminGrammarExample
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: Colors.purple,
         onPressed: _detail == null ? null : () => _showExampleFormDialog(),
-        icon: Icon(Icons.add, color: Theme.of(context).cardColor),
-        label: Text('Thêm Ví dụ', style: TextStyle(color: Theme.of(context).cardColor)),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(tr('Thêm Ví dụ'), style: const TextStyle(color: Colors.white)),
       ),
     );
   }

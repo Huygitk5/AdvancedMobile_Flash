@@ -75,11 +75,12 @@ void main() {
   test('APPLIED: áp data.progress, log -> synced, op bị xoá, snapshot user ghi vào user_profile', () async {
     final card = (await db.contentDao.watchCards('t1').first).first;
     await SrsRepository(db, noKick).rate(card, 'KNOW', responseTimeMs: 800);
-    expect((await db.profileDao.current())!.pendingXp, 2);
+    // Know đầu tiên: +2 và thẻ thành "đã học" (box 1): +5
+    expect((await db.profileDao.current())!.pendingXp, 7);
 
     api.onPush = all('APPLIED', data: (o) => {
-          'progress': {'flashcardId': card.id, 'box': 1, 'repetitions': 1, 'isLearned': false, 'version': 7},
-          'xpAwarded': 2,
+          'progress': {'flashcardId': card.id, 'box': 1, 'repetitions': 1, 'isLearned': true, 'version': 7},
+          'xpAwarded': 7,
         });
     await worker.flush();
 

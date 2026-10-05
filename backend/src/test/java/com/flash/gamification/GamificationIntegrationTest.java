@@ -63,18 +63,21 @@ class GamificationIntegrationTest extends IntegrationTestBase {
         String logId = UUID.randomUUID().toString();
 
         JsonNode first = review(token, logId, BEAUTIFUL, "KNOW", at);
-        assertThat(first.get("xpAwarded").asInt()).isEqualTo(2);
+        // Know lần đầu: +2 (know trong ngày) +5 (từ chuyển sang "đã học")
+        assertThat(first.get("xpAwarded").asInt()).isEqualTo(2 + 5);
+        assertThat(first.at("/progress/isLearned").asBoolean()).isTrue();
+        assertThat(first.at("/user/totalWordsLearned").asInt()).isEqualTo(1);
         assertThat(first.get("duplicate").asBoolean()).isFalse();
         assertThat(first.at("/progress/box").asInt()).isEqualTo(1);
         assertThat(Instant.parse(first.at("/progress/dueAt").asText())).isEqualTo(at.plusSeconds(86_400));
-        assertThat(first.at("/user/currentXp").asInt()).isEqualTo(2);
+        assertThat(first.at("/user/currentXp").asInt()).isEqualTo(7);
         assertThat(first.at("/user/streakDays").asInt()).isEqualTo(1);
 
         // Retry (mất mạng sau khi server đã xử lý): không cộng gì thêm
         JsonNode retry = review(token, logId, BEAUTIFUL, "KNOW", at);
         assertThat(retry.get("duplicate").asBoolean()).isTrue();
         assertThat(retry.get("xpAwarded").asInt()).isZero();
-        assertThat(retry.at("/user/currentXp").asInt()).isEqualTo(2);
+        assertThat(retry.at("/user/currentXp").asInt()).isEqualTo(7);
 
         // Know lần hai cùng thẻ trong cùng ngày: SRS vẫn tiến nhưng XP "know" chỉ tính lần đầu trong ngày
         JsonNode second = review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", at.plusSeconds(300));
@@ -87,7 +90,7 @@ class GamificationIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void cardBecomesLearnedAtBoxThreeAndUpdatesTopicProgress() throws Exception {
+    void cardBecomesLearnedOnFirstKnowAndUpdatesTopicProgress() throws Exception {
         JsonNode auth = register(uniqueEmail());
         String token = bearer(auth);
         LocalDate today = LocalDate.now(VN);
@@ -95,15 +98,21 @@ class GamificationIntegrationTest extends IntegrationTestBase {
         Instant d2 = today.minusDays(2).atTime(9, 0).atZone(VN).toInstant();
         Instant d3 = today.minusDays(1).atTime(9, 0).atZone(VN).toInstant();
 
-        review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", d1);
+        JsonNode firstKnow = review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", d1);
+        assertThat(firstKnow.at("/progress/isLearned").asBoolean()).isTrue();
+        assertThat(firstKnow.get("xpAwarded").asInt()).isEqualTo(2 + 5);
         review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", d2);
         JsonNode third = review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", d3);
 
         assertThat(third.at("/progress/isLearned").asBoolean()).isTrue();
-        assertThat(third.get("xpAwarded").asInt()).isEqualTo(2 + 5);
+        // Thưởng "đã học" chỉ một lần cho mỗi từ; các lần ôn sau chỉ có +2 của ngày đó
+        assertThat(third.get("xpAwarded").asInt()).isEqualTo(2);
         assertThat(third.at("/user/currentXp").asInt()).isEqualTo(3 * 2 + 5);
         assertThat(third.at("/user/totalWordsLearned").asInt()).isEqualTo(1);
         assertThat(third.at("/user/streakDays").asInt()).isEqualTo(3);
+        // Từ chỉ được tính vào "số từ đã học" của ngày đầu tiên
+        assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(words_learned), 0) FROM daily_statistics WHERE user_id = ?",
+                Integer.class, auth.at("/user/id").asText())).isEqualTo(1);
 
         // Daily Life chỉ có 1 từ => thuộc hết là hoàn thành topic
         JsonNode topics = getData(token, "/v1/topics?status=COMPLETED").get("items");
@@ -430,11 +439,99 @@ class GamificationIntegrationTest extends IntegrationTestBase {
         JsonNode board = getData(token, "/v1/leaderboard/xp?limit=5");
         assertThat(board.get("items").size()).isBetween(1, 5);
         assertThat(board.at("/items/0/rank").asInt()).isEqualTo(1);
-        assertThat(board.at("/me/score").asLong()).isEqualTo(2);
+        assertThat(board.at("/me/score").asLong()).isEqualTo(7);
         assertThat(board.at("/me/rank").asInt()).isPositive();
 
         JsonNode streak = getData(token, "/v1/leaderboard/streak");
         assertThat(streak.at("/me/score").asLong()).isEqualTo(1);
+    }
+
+    // ------------------------------------------------------------------ học lại / bảng xếp hạng / thống kê
+
+    /** Học lại một bài đã hoàn thành không được cộng thêm "bài học hoàn thành", "bài hôm nay" hay XP. */
+    @Test
+    void relearningTheSameLessonDoesNotInflateCountersOrXp() throws Exception {
+        JsonNode auth = register(uniqueEmail());
+        String token = bearer(auth);
+
+        JsonNode first = dataOf(send(post("/v1/lessons/complete"), token,
+                lesson(UUID.randomUUID().toString(), "TOPIC", DAILY_LIFE, null)).andExpect(status().isCreated()));
+        assertThat(first.get("xpAwarded").asInt()).isEqualTo(10);
+        assertThat(first.at("/user/completedLessons").asInt()).isEqualTo(1);
+
+        // Cùng chủ đề, id hoàn thành mới (học lại): vẫn ghi nhận lượt học nhưng không cộng gì thêm
+        JsonNode again = dataOf(send(post("/v1/lessons/complete"), token,
+                lesson(UUID.randomUUID().toString(), "TOPIC", DAILY_LIFE, null)).andExpect(status().isCreated()));
+        assertThat(again.get("duplicate").asBoolean()).isFalse();
+        assertThat(again.get("xpAwarded").asInt()).isZero();
+        assertThat(again.at("/user/completedLessons").asInt()).isEqualTo(1);
+        assertThat(again.at("/todayLessons/done").asInt()).isEqualTo(1);
+        assertThat(again.at("/user/currentXp").asInt()).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lesson_completions WHERE user_id = ?", Integer.class,
+                auth.at("/user/id").asText())).isEqualTo(2);
+
+        // Một bài khác thì vẫn được tính
+        JsonNode other = dataOf(send(post("/v1/lessons/complete"), token,
+                lesson(UUID.randomUUID().toString(), "GRAMMAR", null, PRESENT_SIMPLE)).andExpect(status().isCreated()));
+        assertThat(other.at("/user/completedLessons").asInt()).isEqualTo(2);
+        assertThat(other.at("/todayLessons/done").asInt()).isEqualTo(2);
+        assertThat(other.get("xpAwarded").asInt()).isEqualTo(10);
+        assertLedgerMatchesBalance(auth.at("/user/id").asText());
+    }
+
+    @Test
+    void leaderboardShowsSloganAndLeavesOutAdmins() throws Exception {
+        JsonNode auth = register(uniqueEmail());
+        String token = bearer(auth);
+        String userId = auth.at("/user/id").asText();
+        jdbc.update("UPDATE users SET slogan = 'Học là phải vui', total_lifetime_xp = 9000000000 WHERE id = ?", userId);
+
+        JsonNode admin = registerAdmin();
+        String adminId = admin.at("/user/id").asText();
+        jdbc.update("UPDATE users SET total_lifetime_xp = 90000000000 WHERE id = ?", adminId);
+
+        // limit riêng (7) để không dính cache 60 giây của các test khác
+        JsonNode board = getData(token, "/v1/leaderboard/xp?limit=7");
+        assertThat(board.at("/items/0/userId").asText()).isEqualTo(userId);
+        assertThat(board.at("/items/0/slogan").asText()).isEqualTo("Học là phải vui");
+        for (JsonNode entry : board.get("items")) {
+            assertThat(entry.get("userId").asText()).isNotEqualTo(adminId);
+        }
+        assertThat(getData(token, "/v1/leaderboard/streak?limit=7").get("items").toString()).doesNotContain(adminId);
+
+        // Admin không có hạng
+        JsonNode asAdmin = getData(bearer(admin), "/v1/leaderboard/xp?limit=7");
+        assertThat(asAdmin.at("/me").has("rank")).isFalse();
+    }
+
+    @Test
+    void statisticsSupportYearAndCustomRanges() throws Exception {
+        String token = bearer(register(uniqueEmail()));
+        review(token, UUID.randomUUID().toString(), BEAUTIFUL, "KNOW", Instant.now().minusSeconds(60));
+        LocalDate today = LocalDate.now(VN);
+
+        JsonNode year = getData(token, "/v1/users/me/statistics?range=YEAR");
+        assertThat(year.get("range").asText()).isEqualTo("YEAR");
+        assertThat(year.get("to").asText()).isEqualTo(today.toString());
+        assertThat(year.get("from").asText()).isEqualTo(today.minusDays(364).toString());
+        // YEAR chỉ trả các ngày có dữ liệu để client gom theo tháng
+        assertThat(year.get("daily")).hasSize(1);
+        assertThat(year.at("/daily/0/wordsLearned").asInt()).isEqualTo(1);
+        assertThat(year.get("wordsLearned").asInt()).isEqualTo(1);
+
+        JsonNode custom = getData(token, "/v1/users/me/statistics?range=CUSTOM&from=" + today.minusDays(9) + "&to=" + today);
+        assertThat(custom.get("daily")).hasSize(10);
+        assertThat(custom.at("/daily/9/wordsLearned").asInt()).isEqualTo(1);
+        assertThat(custom.at("/daily/0/wordsLearned").asInt()).isZero();
+
+        mockMvc.perform(get("/v1/users/me/statistics?range=CUSTOM").header("Authorization", token))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/users/me/statistics?range=CUSTOM&from=" + today + "&to=" + today.minusDays(1))
+                        .header("Authorization", token))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/users/me/statistics?range=CUSTOM&from=" + today.minusDays(400) + "&to=" + today)
+                        .header("Authorization", token))
+                .andExpect(status().isBadRequest());
     }
 
     // ------------------------------------------------------------------ helpers

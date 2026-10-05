@@ -1,3 +1,4 @@
+import '../core/l10n.dart';
 import '_json.dart';
 
 class Grammar {
@@ -35,15 +36,15 @@ class Grammar {
     this.isPublished = true,
   });
 
-  /// Nhãn trạng thái ở danh sách (VD "Đang học 60%").
+  /// Nhãn trạng thái ở danh sách (VD "Đang học 60%"), theo ngôn ngữ giao diện.
   String get statusLabel {
     switch (status) {
       case 'COMPLETED':
-        return 'Đã học 100%';
+        return trf('Đã học {p}%', {'p': 100});
       case 'IN_PROGRESS':
-        return 'Đang học ${(progress * 100).round()}%';
+        return trf('Đang học {p}%', {'p': (progress * 100).round()});
       default:
-        return 'Chưa học 0%';
+        return trf('Chưa học {p}%', {'p': 0});
     }
   }
 

@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Chạy với MySQL 8 thật (Testcontainers): Flyway V1/V2 + Hibernate validate được kiểm tra mỗi lần test.
  * Một container dùng chung cho mọi test class (singleton), nên mỗi test tự tạo email riêng.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.auth.require-email-verification=false")
 @AutoConfigureMockMvc
 public abstract class IntegrationTestBase {
 
@@ -56,6 +56,8 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.password", MYSQL::getPassword);
         // MockMvc luôn gọi từ cùng 1 IP: nới rate limit để các test không chặn lẫn nhau
         registry.add("app.auth.rate-limit-per-minute", () -> 10_000);
+        // Test dựa trên dữ liệu seed nhỏ V2 (VD: Daily Life có đúng 1 từ); bộ seed lớn ở db/seed được kiểm riêng
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration");
     }
 
     @Autowired

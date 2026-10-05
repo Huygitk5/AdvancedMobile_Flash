@@ -3,12 +3,13 @@
 ///
 /// - Know:  box = min(box + 1, 5), due = reviewedAt + intervals[box]
 /// - Again: box = max(box - 2, 0), due = reviewedAt + 10 phút
-/// - is_learned = box >= 3 (có thể rớt lại nếu có log AGAIN đến muộn)
+/// - is_learned = box >= 1: "đã học" ngay từ lần Know đầu tiên; Again kéo về box 0 thì mất trạng thái
+///   (có thể rớt lại nếu có log AGAIN đến muộn)
 class Srs {
   const Srs._();
 
   static const maxBox = 5;
-  static const learnedBox = 3;
+  static const learnedBox = 1;
   static const againBoxDrop = 2;
   static const againDelay = Duration(minutes: 10);
 

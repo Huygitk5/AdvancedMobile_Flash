@@ -11,6 +11,7 @@ class AuthApi {
       AuthDto.fromJson(await _c.post('/v1/auth/login',
           body: {'email': email, 'password': password, 'deviceId': deviceId}) as Map<String, dynamic>);
 
+  /// Khi server bật xác thực email: trả `verificationRequired = true` (chưa có token) và gửi OTP tới email.
   Future<AuthDto> register({
     required String fullName,
     required String email,
@@ -23,6 +24,14 @@ class AuthApi {
         'password': password,
         'deviceId': deviceId,
       }) as Map<String, dynamic>);
+
+  /// Đúng OTP thì kích hoạt tài khoản và cấp token luôn.
+  Future<AuthDto> verifyEmail({required String email, required String otp, required String deviceId}) async =>
+      AuthDto.fromJson(await _c.post('/v1/auth/verify-email',
+          body: {'email': email, 'otp': otp, 'deviceId': deviceId}) as Map<String, dynamic>);
+
+  /// Luôn 200 dù email có tồn tại hay không.
+  Future<void> resendVerification(String email) => _c.post('/v1/auth/resend-verification', body: {'email': email});
 
   Future<AuthDto> google({required String idToken, required String deviceId}) async =>
       AuthDto.fromJson(await _c.post('/v1/auth/google',

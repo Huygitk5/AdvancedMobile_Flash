@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../../core/config.dart';
 import '../local/app_database.dart';
 import '../remote/api_client.dart';
 import '../remote/apis/sync_api.dart';
@@ -60,6 +61,7 @@ void backgroundSyncDispatcher() {
     final db = AppDatabase();
     try {
       final prefs = await AppPrefs.load();
+      await AppConfig.load();
       final store = SecureStore();
       if (await store.refreshToken() == null || await store.userRole() == 'ADMIN') return true;
       // Refresh token bị từ chối ở nền: không xoá dữ liệu ở đây, lần mở app tiếp theo sẽ xử lý.

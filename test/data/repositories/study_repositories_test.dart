@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flash/core/clock.dart';
 import 'package:flash/data/local/app_database.dart';
 import 'package:flash/data/remote/apis/gamification_api.dart';
+import 'package:flash/data/repositories/base_repository.dart';
 import 'package:flash/data/repositories/study_repositories.dart';
 import 'package:flash/data/repositories/user_repositories.dart';
 
@@ -42,7 +43,8 @@ void main() {
     final card = (await db.contentDao.watchCards('t1').first).first;
     final xp = await repo.rate(card, 'KNOW', responseTimeMs: 1200);
 
-    expect(xp, 2);
+    // Know đầu tiên: +2 (Know trong ngày) và thẻ thành "đã học" (box 1) lần đầu: +5
+    expect(xp, 2 + 5);
     expect(kicks, 1);
     final op = (await db.syncDao.nextBatch()).single;
     expect(op.opType, 'FLASHCARD_REVIEW');
@@ -50,23 +52,41 @@ void main() {
     expect(op.payload['rating'], 'KNOW');
     expect((await db.srsDao.progressOf(card.id))!.box, 1);
     expect((await db.questDao.byId('uq1'))!.current, 1);
-    expect((await db.statsDao.watchDay('2026-10-05').first)!.cardsReviewed, 1);
+    final stats = (await db.statsDao.watchDay('2026-10-05').first)!;
+    expect(stats.cardsReviewed, 1);
+    expect(stats.wordsLearned, 1);
     final topic = (await db.contentDao.watchTopic('t1').first)!;
     expect(topic.status, 'IN_PROGRESS');
-    expect((await db.profileDao.current())!.displayXp, 102);
+    expect((await db.profileDao.current())!.displayXp, 107);
   });
 
-  test('3 lần Know -> thẻ thuộc: +5 XP lần đầu, đếm lại số từ đã thuộc', () async {
+  test('Know đầu tiên -> thẻ đã học: +5 XP một lần; Know -> Again -> Know không cộng lại, không đếm thêm từ mới', () async {
     final repo = SrsRepository(db, kick);
     final card = (await db.contentDao.watchCards('t1').first).firstWhere((c) => c.id == 'f1');
-    await repo.rate(card, 'KNOW');
-    Clock.override(() => now.add(const Duration(days: 1)));
-    await repo.rate(card, 'KNOW');
-    Clock.override(() => now.add(const Duration(days: 4)));
-    final xp = await repo.rate(card, 'KNOW');
-    expect(xp, 2 + 5);
+    expect(await repo.rate(card, 'KNOW'), 2 + 5);
     expect((await db.profileDao.current())!.totalWordsLearned, 1);
     expect((await db.contentDao.watchTopic('t1').first)!.learnedWords, 1);
+
+    Clock.override(() => now.add(const Duration(days: 1)));
+    await repo.rate(card, 'AGAIN'); // box 1 -> 0: mất trạng thái đã học
+    expect((await db.profileDao.current())!.totalWordsLearned, 0);
+
+    Clock.override(() => now.add(const Duration(days: 1, minutes: 20)));
+    final xp = await repo.rate(card, 'KNOW');
+    expect(xp, 2, reason: '+5 "đã học" chỉ tính lần đầu tiên');
+    expect((await db.profileDao.current())!.totalWordsLearned, 1);
+    final day2 = (await db.statsDao.watchDay('2026-10-06').first)!;
+    expect(day2.wordsLearned, 0, reason: 'chỉ lần Know đầu tiên của thẻ mới tính là từ mới học');
+  });
+
+  test('lesson: học lại cùng bài trong ngày không +XP, completed_lessons chỉ tăng lần đầu, "x/5 bài" đếm bài khác nhau', () async {
+    final repo = LessonRepository(db, kick);
+    expect((await repo.completeTopic('t1', cardsReviewed: 2, durationSeconds: 60)).xpEstimate, 10);
+    expect((await repo.completeTopic('t1', cardsReviewed: 2, durationSeconds: 60)).xpEstimate, 0);
+    expect((await db.profileDao.current())!.completedLessons, 1);
+    expect((await db.statsDao.watchDay('2026-10-05').first)!.lessonsCompleted, 2);
+    final (start, end) = WriteRepository.dayBounds(now);
+    expect(await db.lessonDao.watchDistinctBetween(start, end).first, 1);
   });
 
   test('quiz: chấm tạm, gửi ĐỦ mọi câu (câu bỏ qua = null), xp_awarded NULL tới khi server chấm', () async {

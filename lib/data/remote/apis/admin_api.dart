@@ -1,3 +1,4 @@
+import '../../../models/admin_models.dart';
 import '../../../models/flashcard_model.dart';
 import '../../../models/grammar_model.dart';
 import '../../../models/quest_definition_model.dart';
@@ -14,11 +15,17 @@ class AdminApi {
 
   final ApiClient _c;
 
+  // ---- tổng quan
+  Future<AdminOverview> overview() async =>
+      AdminOverview.fromJson(await _c.get('/v1/admin/overview') as Map<String, dynamic>);
+
   // ---- users
-  Future<PageDto<UserModel>> users({String? keyword, String? status, int page = 0, int size = 20}) => _c.getPage(
+  /// [role] = 'USER' (học viên) hoặc 'ADMIN' (quản trị viên); null = tất cả.
+  Future<PageDto<UserModel>> users({String? keyword, String? status, String? role, int page = 0, int size = 20}) =>
+      _c.getPage(
         '/v1/users',
         UserModel.fromJson,
-        query: {'keyword': ?keyword, 'status': ?status, 'page': page, 'size': size},
+        query: {'keyword': ?keyword, 'status': ?status, 'role': ?role, 'page': page, 'size': size},
       );
 
   Future<UserModel> createUser(Map<String, dynamic> body) async =>

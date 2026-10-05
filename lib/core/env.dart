@@ -12,5 +12,9 @@ class Env {
 
   /// OAuth client id loại **Web** (Google Cloud) để Android nhận được `idToken` cho `/v1/auth/google`.
   /// Phải nằm trong `GOOGLE_CLIENT_IDS` của backend. Rỗng = nút Google báo chưa cấu hình.
-  static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  /// Client ID không phải bí mật nên đặt sẵn giá trị mặc định; vẫn ghi đè được bằng --dart-define.
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '887843851502-bqhkmojl022pbhob1hgeerk8ejaj5tcj.apps.googleusercontent.com',
+  );
 }

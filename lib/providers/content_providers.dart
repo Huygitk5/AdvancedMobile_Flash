@@ -19,6 +19,16 @@ final grammarListProvider = StreamProvider.autoDispose.family<List<Grammar>, Lis
   (ref, q) => ref.watch(dbProvider).contentDao.watchGrammarWithProgress(filter: q.filter, keyword: q.keyword),
 );
 
+/// Từ đã lưu (màn "Từ đã lưu" ở Cá nhân).
+final bookmarkedCardsProvider = StreamProvider.autoDispose<List<Flashcard>>(
+  (ref) => ref.watch(dbProvider).contentDao.watchBookmarkedCards(),
+);
+
+/// Từ vựng khớp từ khoá (từ hoặc nghĩa), tối đa 10 kết quả.
+final searchCardsProvider = StreamProvider.autoDispose.family<List<Flashcard>, String>(
+  (ref, keyword) => ref.watch(dbProvider).contentDao.watchSearchCards(keyword),
+);
+
 final topicProvider = StreamProvider.autoDispose.family<Topic?, String>(
   (ref, id) => ref.watch(dbProvider).contentDao.watchTopic(id),
 );
@@ -34,6 +44,15 @@ final grammarDetailProvider = StreamProvider.autoDispose.family<GrammarDetail?, 
 
 final topicQuizProvider = StreamProvider.autoDispose.family<Quiz?, String>(
   (ref, topicId) => ref.watch(dbProvider).contentDao.watchQuizForTopic(topicId),
+);
+
+/// Mọi bài kiểm tra (có câu hỏi) của một topic.
+final topicQuizzesProvider = StreamProvider.autoDispose.family<List<Quiz>, String>(
+  (ref, topicId) => ref
+      .watch(dbProvider)
+      .contentDao
+      .watchQuizzesForTopic(topicId)
+      .map((qs) => qs.where((q) => q.questionCount > 0).toList()),
 );
 
 /// Đề + câu hỏi (4 đáp án) của một quiz.

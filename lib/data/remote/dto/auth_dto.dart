@@ -18,6 +18,8 @@ class UserDto {
     required this.status,
     required this.version,
     required this.clientUpdatedAt,
+    this.emailVerified = false,
+    this.hasPassword = true,
     this.raw = const {},
   });
 
@@ -41,6 +43,10 @@ class UserDto {
   final String status; // 'PENDING_VERIFY' | 'ACTIVE' | 'LOCKED'
   final int version;
   final String? clientUpdatedAt; // ISO-8601
+  final bool emailVerified;
+
+  /// false với tài khoản chỉ đăng nhập Google (đổi mật khẩu không cần mật khẩu cũ).
+  final bool hasPassword;
 
   factory UserDto.fromJson(Map<String, dynamic> j) => UserDto(
         id: j['id'] as String, // không fallback '' cho id
@@ -60,11 +66,16 @@ class UserDto {
         status: (j['status'] ?? 'ACTIVE') as String,
         version: (j['version'] ?? 0) as int,
         clientUpdatedAt: j['clientUpdatedAt'] as String?,
+        emailVerified: (j['emailVerified'] ?? false) as bool,
+        hasPassword: (j['hasPassword'] ?? true) as bool,
         raw: j,
       );
 }
 
 /// Khớp `AuthResponse` của backend.
+///
+/// Đăng ký khi server bật xác thực email: `verificationRequired = true`, CHƯA có token; client mở màn nhập OTP
+/// (`POST /v1/auth/verify-email`). Mọi luồng khác luôn có token.
 class AuthDto {
   const AuthDto({
     required this.user,
@@ -72,6 +83,7 @@ class AuthDto {
     required this.refreshToken,
     required this.expiresIn,
     required this.refreshTokenExpiresAt,
+    this.verificationRequired = false,
   });
 
   final UserDto user;
@@ -81,12 +93,16 @@ class AuthDto {
   /// Số giây access token còn hiệu lực.
   final int expiresIn;
   final String? refreshTokenExpiresAt;
+  final bool verificationRequired;
+
+  bool get hasSession => accessToken.isNotEmpty && refreshToken.isNotEmpty;
 
   factory AuthDto.fromJson(Map<String, dynamic> j) => AuthDto(
         user: UserDto.fromJson(j['user'] as Map<String, dynamic>),
-        accessToken: j['accessToken'] as String,
-        refreshToken: j['refreshToken'] as String,
-        expiresIn: (j['expiresIn'] as num).toInt(),
+        accessToken: (j['accessToken'] ?? '') as String,
+        refreshToken: (j['refreshToken'] ?? '') as String,
+        expiresIn: (j['expiresIn'] as num?)?.toInt() ?? 0,
         refreshTokenExpiresAt: j['refreshTokenExpiresAt'] as String?,
+        verificationRequired: (j['verificationRequired'] ?? false) as bool,
       );
 }
