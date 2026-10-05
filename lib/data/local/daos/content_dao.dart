@@ -6,6 +6,7 @@ import '../../../core/clock.dart';
 import '../../../models/flashcard_model.dart';
 import '../../../models/grammar_model.dart';
 import '../../../models/quiz_model.dart';
+import '../../../models/saved_word_topic_model.dart';
 import '../../../models/topic_model.dart';
 import '../../../models/_json.dart';
 import '../converters.dart';
@@ -85,12 +86,48 @@ class ContentDao extends BaseDao {
       'LEFT JOIN user_flashcard_notes n ON n.flashcard_id = f.id AND n.deleted_at IS NULL '
       'LEFT JOIN user_bookmarks b ON b.flashcard_id = f.id ';
 
-  /// Từ đã lưu (bookmark), lưu gần nhất trước.
-  Stream<List<Flashcard>> watchBookmarkedCards() => select(
-        '${_cardSelect}WHERE b.flashcard_id IS NOT NULL AND b.deleted_at IS NULL ORDER BY b.created_at DESC',
+  /// Các topic có từ đã lưu, kèm số từ đã lưu trong mỗi topic.
+  Stream<List<SavedWordTopic>> watchBookmarkedTopicSummaries() =>
+      select(
+        'SELECT t.id AS topic_id, t.title, t.icon_path, COUNT(*) AS saved_count, MAX(b.created_at) AS last_saved_at '
+        'FROM user_bookmarks b '
+        'JOIN flashcards f ON f.id = b.flashcard_id '
+        'JOIN topics t ON t.id = f.topic_id '
+        'WHERE b.deleted_at IS NULL '
+        'GROUP BY t.id, t.title, t.icon_path '
+        'ORDER BY last_saved_at DESC, t.title',
         const [],
-        _cardTables,
-      ).watch().map((rows) => rows.map(_card).toList());
+        const ['user_bookmarks', 'flashcards', 'topics'],
+      ).watch().map(
+        (rows) => rows
+            .map(
+              (r) => SavedWordTopic(
+                topicId: r.s('topic_id'),
+                title: r.s('title'),
+                iconPath: r.s('icon_path'),
+                wordCount: r.i('saved_count'),
+              ),
+            )
+            .toList(),
+      );
+
+  /// Từ đã lưu (bookmark), lưu gần nhất trước. Có thể lọc theo topic và từ khoá trong từ / nghĩa.
+  Stream<List<Flashcard>> watchBookmarkedCards({
+    String? topicId,
+    String keyword = '',
+  }) {
+    final topic = (topicId ?? '').trim();
+    final kw = keyword.trim();
+    final like = '%${_escapeLike(kw)}%';
+    return select(
+      '${_cardSelect}WHERE b.flashcard_id IS NOT NULL AND b.deleted_at IS NULL '
+      "AND (? = '' OR f.topic_id = ?) "
+      "AND (? = '' OR f.word LIKE ? ESCAPE '\\' OR f.meaning LIKE ? ESCAPE '\\') "
+      'ORDER BY b.created_at DESC, f.word',
+      [topic, topic, kw, like, like],
+      _cardTables,
+    ).watch().map((rows) => rows.map(_card).toList());
+  }
 
   /// Tìm từ vựng theo từ khoá (khớp từ hoặc nghĩa), tối đa [limit] kết quả.
   Stream<List<Flashcard>> watchSearchCards(String keyword, {int limit = 10}) {

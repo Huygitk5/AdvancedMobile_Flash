@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../models/leaderboard_model.dart';
+import '../../models/user_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
 import '../../widgets/common.dart';
@@ -58,31 +59,56 @@ class _BoardView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lb = ref.watch(leaderboardProvider(board));
-    final myId = ref.watch(profileProvider).value?.id;
+    final user = ref.watch(profileProvider).value;
+    final myId = user?.id;
     return lb.when(
       loading: () => const LoadingView(),
       error: (e, _) => ErrorView(message: trf('Không tải được bảng xếp hạng: {e}', {'e': e}), onRetry: () => _refresh(ref)),
       data: (data) => RefreshIndicator(
         onRefresh: () => _refresh(ref),
         child: data == null
-            ? ListView(children: [
-                SizedBox(
+            ? ListView(
+                children: [
+                  SizedBox(
                     height: 300,
-                    child: EmptyView(message: tr('Cần kết nối mạng để xem bảng xếp hạng.'), icon: Icons.cloud_off_rounded)),
-              ])
-            : data.items.isEmpty
-                ? ListView(children: [
-                    SizedBox(
-                        height: 300,
-                        child: EmptyView(message: tr('Chưa có ai trên bảng xếp hạng'), icon: Icons.emoji_events_outlined)),
-                  ])
-                : ListView(
-                    padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
-                    children: [
-                      if (data.me != null) _buildMe(context, ref, data.me!),
-                      ...data.items.map((e) => _entryCard(context, e, isMe: e.userId == myId)),
-                    ],
+                    child: EmptyView(
+                      message: tr('Cần kết nối mạng để xem bảng xếp hạng.'),
+                      icon: Icons.cloud_off_rounded,
+                    ),
                   ),
+                ],
+              )
+            : data.items.isEmpty
+            ? ListView(
+                children: [
+                  SizedBox(
+                    height: 300,
+                    child: EmptyView(
+                      message: tr('Chưa có ai trên bảng xếp hạng'),
+                      icon: Icons.emoji_events_outlined,
+                    ),
+                  ),
+                ],
+              )
+            : ListView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  20 + MediaQuery.of(context).padding.bottom,
+                ),
+                children: [
+                  if (data.me != null) _buildMe(context, ref, data.me!),
+                  ...data.items.map(
+                    (e) => _entryCard(
+                      context,
+                      e,
+                      isMe: e.userId == myId,
+                      currentUser: user,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -101,37 +127,88 @@ class _BoardView extends ConsumerWidget {
         children: [
           SizedBox(
             width: 44,
-            child: Text(me.rank == null ? '—' : '#${me.rank}',
-                style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primaryColor, fontSize: 16)),
+            child: Text(
+              me.rank == null ? '—' : '#${me.rank}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                color: AppTheme.primaryColor,
+                fontSize: 16,
+              ),
+            ),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr('Hạng của bạn'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                Text(user?.fullName ?? '',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                  tr('Hạng của bạn'),
+                  style: const TextStyle(
+                    color: AppTheme.greyColor,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  user?.fullName ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
           ),
-          Text('${me.score}',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
+          Text(
+            '${me.score}',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              color: isXp ? Colors.amber.shade600 : Colors.orange.shade600,
+            ),
+          ),
           const SizedBox(width: 4),
-          Text(_unit, style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            _unit,
+            style: const TextStyle(
+              color: AppTheme.greyColor,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _entryCard(BuildContext context, LeaderboardEntry entry, {required bool isMe}) {
+  Widget _entryCard(
+    BuildContext context,
+    LeaderboardEntry entry, {
+    required bool isMe,
+    UserModel? currentUser,
+  }) {
     final rank = entry.rank;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topColor = _rankColor(rank);
+    final fullName = isMe
+        ? (currentUser?.fullName ?? entry.fullName)
+        : entry.fullName;
+    final slogan = isMe ? (currentUser?.slogan ?? entry.slogan) : entry.slogan;
+    final avatarUrl = isMe
+        ? (currentUser?.equippedAvatarUrl ??
+              currentUser?.avatarUrl ??
+              entry.avatarUrl)
+        : entry.avatarUrl;
+    final borderColors = isMe
+        ? (currentUser?.equippedBorderColors ?? entry.equippedBorderColors)
+        : entry.equippedBorderColors;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isMe ? (isDark ? const Color(0xFF1F2E4A) : const Color(0xFFF0F5FF)) : Theme.of(context).cardColor,
+        color: isMe
+            ? (isDark ? const Color(0xFF1F2E4A) : const Color(0xFFF0F5FF))
+            : Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: rank <= 3
             ? Border.all(color: topColor, width: 2)
@@ -151,27 +228,37 @@ class _BoardView extends ConsumerWidget {
           UserAvatar(
             size: 50,
             ringWidth: 3,
-            borderColors: borderColorsOf(entry.equippedBorderColors),
-            imageUrl: entry.avatarUrl,
-            initials: initialsOf(entry.fullName),
+            borderColors: borderColorsOf(borderColors),
+            imageUrl: avatarUrl,
+            initials: initialsOf(fullName),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(isMe ? '${entry.fullName} (${tr('Bạn')})' : entry.fullName,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                  isMe ? '$fullName (${tr('Bạn')})' : fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
                 const SizedBox(height: 3),
                 Text(
-                  entry.slogan.isEmpty ? tr('Chưa có câu châm ngôn') : entry.slogan,
+                  slogan.isEmpty ? tr('Chưa có câu châm ngôn') : slogan,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      color: AppTheme.greyColor,
-                      fontSize: 12,
-                      // Chỉ in nghiêng slogan thật, câu mặc định thì chữ thường
-                      fontStyle: entry.slogan.isNotEmpty ? FontStyle.italic : FontStyle.normal),
+                    color: AppTheme.greyColor,
+                    fontSize: 12,
+                    // Chỉ in nghiêng slogan thật, câu mặc định thì chữ thường
+                    fontStyle: slogan.isNotEmpty
+                        ? FontStyle.italic
+                        : FontStyle.normal,
+                  ),
                 ),
               ],
             ),
@@ -180,9 +267,22 @@ class _BoardView extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${entry.score}',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isXp ? Colors.amber.shade600 : Colors.orange.shade600)),
-              Text(_unit, style: const TextStyle(color: AppTheme.greyColor, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(
+                '${entry.score}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: isXp ? Colors.amber.shade600 : Colors.orange.shade600,
+                ),
+              ),
+              Text(
+                _unit,
+                style: const TextStyle(
+                  color: AppTheme.greyColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ],
