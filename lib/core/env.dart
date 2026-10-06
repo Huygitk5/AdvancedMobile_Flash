@@ -15,6 +15,6 @@ class Env {
   /// Client ID không phải bí mật nên đặt sẵn giá trị mặc định; vẫn ghi đè được bằng --dart-define.
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '887843851502-kmi9207u754srhvfgadfacr1v9ec7bgn.apps.googleusercontent.com',
+    defaultValue: '887843851502-bqhkmojl022pbhob1hgeerk8ejaj5tcj.apps.googleusercontent.com',
   );
 }
