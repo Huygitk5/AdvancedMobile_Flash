@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget vuông bo góc: header + một thẻ flashcard mỗi lần (StackView, vuốt lên/xuống để đổi từ). -->
+<!-- Widget vuông bo góc: header + một thẻ flashcard (hai mặt chồng nhau, chạm để lật)
+     + thanh dưới ‹ vị trí ›. RemoteViews thường, không dùng danh sách. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -8,11 +9,11 @@
     android:paddingLeft="10dp"
     android:paddingTop="10dp"
     android:paddingRight="10dp"
-    android:paddingBottom="6dp"
+    android:paddingBottom="2dp"
     android:background="@drawable/widget_bg"
     android:clipToOutline="true">
 
-    <!-- Header: chạm để mở app vào chủ đề của thẻ vừa lật -->
+    <!-- Header: chạm để mở app vào chủ đề của thẻ đang hiện -->
     <LinearLayout
         android:id="@+id/widget_header"
         android:layout_width="match_parent"
@@ -47,13 +48,87 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <StackView
-            android:id="@+id/widget_stack"
+        <!-- Mặt trước: từ + "Chạm để lật" -->
+        <LinearLayout
+            android:id="@+id/card_front"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:loopViews="true" />
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:background="@drawable/widget_card_front">
+            <TextView
+                android:id="@+id/front_word"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#FF111827"
+                android:maxLines="2"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/front_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textSize="11sp"
+                android:textColor="#FF9CA3AF"
+                android:maxLines="1" />
+        </LinearLayout>
 
-        <!-- Empty view (setEmptyView): "Không có từ nào" hoặc "Widget đang tắt – chạm để bật" -->
+        <!-- Mặt sau: từ, loại từ, phiên âm, nghĩa -->
+        <LinearLayout
+            android:id="@+id/card_back"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:background="@drawable/widget_card_back"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/back_word"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FF111827"
+                android:maxLines="1"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/back_pos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:textStyle="italic"
+                android:textColor="#FF4F46E5"
+                android:maxLines="1" />
+            <TextView
+                android:id="@+id/back_pronunciation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:textColor="#FF6B7280"
+                android:maxLines="1"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/back_meaning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="14sp"
+                android:textColor="#FF111827"
+                android:maxLines="3"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Trạng thái rỗng / widget tắt: chạm để mở app hoặc màn cấu hình -->
         <TextView
             android:id="@+id/widget_empty"
             android:layout_width="match_parent"
@@ -61,18 +136,43 @@
             android:gravity="center"
             android:padding="8dp"
             android:textSize="13sp"
-            android:textColor="#FF6B7280" />
+            android:textColor="#FF6B7280"
+            android:visibility="gone" />
     </FrameLayout>
 
-    <!-- Gợi ý cử chỉ: "Vuốt lên để đổi từ" -->
-    <TextView
-        android:id="@+id/widget_footer"
+    <!-- Thanh dưới: ‹  3/10  › (mỗi nút vùng chạm tối thiểu 40dp) -->
+    <LinearLayout
+        android:id="@+id/widget_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingTop="4dp"
-        android:textSize="10sp"
-        android:textColor="#FF9CA3AF"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:layout_height="40dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/widget_prev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="‹"
+            android:textSize="24sp"
+            android:textColor="#FF4F46E5"
+            android:contentDescription="Previous" />
+        <TextView
+            android:id="@+id/widget_pos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="#FF6B7280"
+            android:maxLines="1" />
+        <TextView
+            android:id="@+id/widget_next"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="›"
+            android:textSize="24sp"
+            android:textColor="#FF4F46E5"
+            android:contentDescription="Next" />
+    </LinearLayout>
 </LinearLayout>

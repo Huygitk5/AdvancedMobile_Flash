@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mặc định 2x2, kéo to được (3x3, 4x4...). updatePeriodMillis=0: app chủ động gọi updateWidget(). -->
+<!-- Mặc định 2x2, kéo to được. updatePeriodMillis=0: app chủ động gọi updateWidget(). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
     android:minHeight="110dp"

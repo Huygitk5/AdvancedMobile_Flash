@@ -576,5 +576,4 @@ const Map<String, String> enTranslations = {
   'Widget đang tắt – chạm để bật': 'Widget is off – tap to turn on',
   'Không có từ nào': 'No words',
   'Chạm để lật': 'Tap to flip',
-  'Vuốt lên để đổi từ': 'Swipe up for next word',
 };
