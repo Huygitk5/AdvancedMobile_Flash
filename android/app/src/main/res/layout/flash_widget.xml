@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Widget vuông bo góc: header + danh sách từ cuộn được (dữ liệu do FlashWidgetService cung cấp). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
-    android:background="@drawable/widget_bg">
+    android:paddingLeft="12dp"
+    android:paddingTop="10dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="4dp"
+    android:background="@drawable/widget_bg"
+    android:clipToOutline="true">
 
-    <!-- Tiêu đề: chạm để mở app -->
+    <!-- Header: chạm để mở app -->
     <LinearLayout
         android:id="@+id/widget_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="4dp">
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -19,63 +27,40 @@
             android:text="Flash English"
             android:textStyle="bold"
             android:textSize="13sp"
-            android:textColor="#FF4F46E5" />
+            android:textColor="#FF4F46E5"
+            android:maxLines="1"
+            android:ellipsize="end" />
         <TextView
             android:id="@+id/widget_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#FF6B7280" />
+            android:layout_marginLeft="6dp"
+            android:textSize="11sp"
+            android:textColor="#FF6B7280"
+            android:maxLines="1" />
     </LinearLayout>
 
-    <!-- Thẻ + nút → -->
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_weight="1">
 
-        <LinearLayout
-            android:id="@+id/widget_card"
-            android:layout_width="0dp"
+        <ListView
+            android:id="@+id/widget_list"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center_vertical">
-            <TextView
-                android:id="@+id/widget_word"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:textColor="#FF111827"
-                android:maxLines="1"
-                android:ellipsize="end" />
-            <TextView
-                android:id="@+id/widget_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:textColor="#FF6B7280" />
-            <TextView
-                android:id="@+id/widget_meaning"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:textColor="#FF111827"
-                android:maxLines="2"
-                android:ellipsize="end"
-                android:visibility="gone" />
-        </LinearLayout>
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbars="none" />
 
+        <!-- Empty view (setEmptyView): "Không có từ nào" hoặc "Widget đang tắt – chạm để bật" -->
         <TextView
-            android:id="@+id/widget_next"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:gravity="center"
-            android:text="→"
-            android:textSize="24sp"
-            android:textColor="#FF4F46E5" />
-    </LinearLayout>
+            android:padding="8dp"
+            android:textSize="13sp"
+            android:textColor="#FF6B7280" />
+    </FrameLayout>
 </LinearLayout>
