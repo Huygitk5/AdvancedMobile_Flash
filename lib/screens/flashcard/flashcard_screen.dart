@@ -13,6 +13,7 @@ import '../../providers/content_providers.dart';
 import '../../providers/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/feedback_dialog.dart';
+import '../../widgets/text_edit_dialog.dart';
 import '../home/completion_screen.dart';
 import '../quiz/quiz_screen.dart';
 
@@ -144,49 +145,17 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
 
 
   void _showNoteDialog(Flashcard card) {
-    final noteController = TextEditingController(text: card.note);
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(trf('Ghi chú cho "{w}"', {'w': card.word}), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: noteController,
-          maxLines: 4,
-          maxLength: 5000,
-          decoration: InputDecoration(
-            hintText: tr('Nhập mẹo nhớ, ngữ cảnh sử dụng...'),
-            hintStyle: const TextStyle(color: AppTheme.greyColor, fontSize: 14),
-            filled: true,
-            fillColor: Theme.of(dialogContext).brightness == Brightness.dark ? const Color(0xFF273449) : const Color(0xFFF4F6FA),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          ),
-        ),
-        actions: [
-          if (card.hasNote)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                ref.read(noteRepositoryProvider).delete(card.id);
-              },
-              child: Text(tr('Xóa'), style: const TextStyle(color: Colors.red)),
-            ),
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              // Ghi SQLite + NOTE_UPSERT; danh sách thẻ đang watch nên tự hiện ghi chú mới.
-              ref.read(noteRepositoryProvider).save(card.id, noteController.text);
-            },
-            child: Text(tr('Lưu'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    ).then((_) => noteController.dispose());
+    showTextEditDialog(
+      context,
+      title: trf('Ghi chú cho "{w}"', {'w': card.word}),
+      hint: tr('Nhập mẹo nhớ, ngữ cảnh sử dụng...'),
+      initialText: card.note ?? '',
+      maxLength: 5000,
+      maxLines: 4,
+      // Ghi SQLite + NOTE_UPSERT; danh sách thẻ đang watch nên tự hiện ghi chú mới.
+      onSave: (text) => ref.read(noteRepositoryProvider).save(card.id, text),
+      onDelete: card.hasNote ? () => ref.read(noteRepositoryProvider).delete(card.id) : null,
+    );
   }
 
   @override
