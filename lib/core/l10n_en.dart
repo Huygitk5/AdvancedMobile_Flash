@@ -554,4 +554,11 @@ const Map<String, String> enTranslations = {
   'Hôm nay bạn đã học chưa?\nĐừng quên hoàn thành bài học\nđể duy trì streak nhé!':
       'Have you studied today?\nDon\'t forget to finish a lesson\nto keep your streak!',
   'Để sau': 'Later',
+
+  // --- Widget màn hình chính
+  'Ôn từ ngay trên màn hình chính': 'Review words right on your home screen',
+  'Lật thẻ cần ôn mà không cần mở app.': 'Flip your due cards without opening the app.',
+  'Thêm widget': 'Add widget',
+  'Thêm widget ra màn hình chính': 'Add widget to home screen',
+  'Không thêm được widget': 'Couldn\'t add the widget',
 };

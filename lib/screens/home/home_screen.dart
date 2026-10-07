@@ -15,6 +15,7 @@ import '../../models/quest_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
+import '../../widgets/add_home_widget_card.dart';
 import '../../widgets/common.dart';
 import '../../widgets/reminder_dialog.dart';
 import '../challenge/challenge_screen.dart';
@@ -102,6 +103,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Gợi ý đặt widget ra màn hình chính (tự ẩn nếu không phải Android / đã bấm).
+                const AddHomeWidgetCard(),
                 _buildHeader(context, user),
                 const SizedBox(height: 25),
                 _buildProgressSection(context),

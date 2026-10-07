@@ -25,6 +25,7 @@ class AppPrefs {
   static const _kLastEmail = 'last_login_email';
   static const _kLastSynced = 'last_synced_timestamp';
   static const _kDbOwner = 'local_db_owner_user_id';
+  static const _kWidgetPrompt = 'home_widget_prompt_done';
 
   bool get isDarkMode => _p.getBool(_kDarkMode) ?? false;
   Future<void> setDarkMode(bool v) => _p.setBool(_kDarkMode, v);
@@ -66,6 +67,10 @@ class AppPrefs {
   /// user_id sở hữu dữ liệu đang nằm trong SQLite. Khác user_id lúc đăng nhập thì phải xoá dữ liệu user.
   String? get localDbOwnerUserId => _p.getString(_kDbOwner);
   Future<void> setLocalDbOwnerUserId(String v) => _p.setString(_kDbOwner, v);
+
+  /// Đã bấm "Thêm widget" / "Để sau" trên thẻ gợi ý ở Trang chủ → không hiện thẻ đó nữa.
+  bool get homeWidgetPromptDone => _p.getBool(_kWidgetPrompt) ?? false;
+  Future<void> setHomeWidgetPromptDone(bool v) => _p.setBool(_kWidgetPrompt, v);
 
   /// Đăng xuất: xoá phần gắn với tài khoản, giữ cài đặt UI.
   Future<void> resetUserScoped() async {

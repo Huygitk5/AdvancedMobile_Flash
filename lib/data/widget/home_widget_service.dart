@@ -126,6 +126,31 @@ class HomeWidgetService {
     return WidgetSnapshot(cards: cards, dueCount: countRow.read<int>('c'));
   }
 
+  /// Launcher có hỗ trợ "ghim widget" (Android 8+, tùy launcher) thì mới hiện nút "Thêm widget".
+  static Future<bool> canRequestPin() async {
+    if (!supported) return false;
+    try {
+      return await HomeWidget.isRequestPinWidgetSupported() == true;
+    } catch (e) {
+      debugPrint('HomeWidgetService.canRequestPin: $e');
+      return false;
+    }
+  }
+
+  /// Gửi dữ liệu mới nhất rồi nhờ launcher hiện hộp thoại đặt widget ra màn hình chính.
+  /// Trả về false nếu không gửi được yêu cầu.
+  static Future<bool> requestPin(AppDatabase db) async {
+    if (!supported) return false;
+    try {
+      await refresh(db);
+      await HomeWidget.requestPinWidget(androidName: _androidName);
+      return true;
+    } catch (e) {
+      debugPrint('HomeWidgetService.requestPin: $e');
+      return false;
+    }
+  }
+
   /// Đọc thẻ đến hạn từ SQLite và gửi sang widget.
   static Future<void> refresh(AppDatabase db) async {
     if (!supported) return;
