@@ -176,6 +176,7 @@ void main() {
     expect(card, {
       'id': 'f1',
       'word': 'word_f1',
+      'partOfSpeech': 'n.',
       'pronunciation': '/f1/',
       'meaning': 'nghĩa f1',
       'topicId': 't1',
@@ -194,6 +195,7 @@ void main() {
       expect(counter.selects, 0);
       expect(writer.data['w_enabled'], '0');
       expect(writer.data['cards'], '[]');
+      expect(writer.data['w_flipped_id'], '');
       expect(writer.data['w_empty'], isNotEmpty);
       expect(writer.updates, 1);
     });
@@ -208,6 +210,9 @@ void main() {
       expect(writer.data['w_enabled'], '1');
       expect((jsonDecode(writer.data['cards']!) as List).length, 2);
       expect(writer.data['w_count_label'], '2 từ');
+      expect(writer.data['w_flipped_id'], '');
+      expect(writer.data['w_tap_hint'], 'Chạm để lật');
+      expect(writer.data['w_swipe_hint'], 'Vuốt lên để đổi từ');
       expect(writer.updates, 1);
     });
   });

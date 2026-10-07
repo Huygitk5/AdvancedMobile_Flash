@@ -1,25 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget vuông bo góc: header + danh sách từ cuộn được (dữ liệu do FlashWidgetService cung cấp). -->
+<!-- Widget vuông bo góc: header + một thẻ flashcard mỗi lần (StackView, vuốt lên/xuống để đổi từ). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:paddingLeft="12dp"
+    android:paddingLeft="10dp"
     android:paddingTop="10dp"
-    android:paddingRight="12dp"
-    android:paddingBottom="4dp"
+    android:paddingRight="10dp"
+    android:paddingBottom="6dp"
     android:background="@drawable/widget_bg"
     android:clipToOutline="true">
 
-    <!-- Header: chạm để mở app -->
+    <!-- Header: chạm để mở app vào chủ đề của thẻ vừa lật -->
     <LinearLayout
         android:id="@+id/widget_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingBottom="4dp">
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:paddingBottom="6dp">
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -45,13 +47,11 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <ListView
-            android:id="@+id/widget_list"
+        <StackView
+            android:id="@+id/widget_stack"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="@null"
-            android:dividerHeight="0dp"
-            android:scrollbars="none" />
+            android:loopViews="true" />
 
         <!-- Empty view (setEmptyView): "Không có từ nào" hoặc "Widget đang tắt – chạm để bật" -->
         <TextView
@@ -63,4 +63,16 @@
             android:textSize="13sp"
             android:textColor="#FF6B7280" />
     </FrameLayout>
+
+    <!-- Gợi ý cử chỉ: "Vuốt lên để đổi từ" -->
+    <TextView
+        android:id="@+id/widget_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="4dp"
+        android:textSize="10sp"
+        android:textColor="#FF9CA3AF"
+        android:maxLines="1"
+        android:ellipsize="end" />
 </LinearLayout>

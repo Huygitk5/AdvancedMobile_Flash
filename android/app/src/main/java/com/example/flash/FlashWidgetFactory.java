@@ -2,22 +2,27 @@ package com.example.flash;
 
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.SharedPreferences;
 import android.util.Log;
+import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Dựng từng dòng của danh sách từ JSON "cards" mà Dart ghi vào "HomeWidgetPreferences". */
+/**
+ * Dựng từng thẻ của StackView từ JSON "cards" mà Dart ghi vào "HomeWidgetPreferences".
+ * Thẻ có id bằng "w_flipped_id" hiện mặt sau, các thẻ khác hiện mặt trước.
+ */
 class FlashWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
     private static final String TAG = "FlashWidget";
     private final Context context;
     private final List<JSONObject> cards = new ArrayList<>();
+    private String flippedId = "";
+    private String tapHint = "";
 
     FlashWidgetFactory(Context context) {
         this.context = context;
@@ -27,20 +32,17 @@ class FlashWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
     public void onCreate() {
     }
 
-    /** Gọi sau notifyAppWidgetViewDataChanged: đọc lại dữ liệu mới nhất. */
+    /** Gọi sau notifyAppWidgetViewDataChanged: đọc lại thẻ, trạng thái lật và nhãn mới nhất. */
     @Override
     public void onDataSetChanged() {
         cards.clear();
         try {
-            String json = context.getSharedPreferences(FlashWidgetProvider.PREFS, Context.MODE_PRIVATE)
-                    .getString("cards", "[]");
-            JSONArray list = new JSONArray(json);
-            for (int i = 0; i < list.length(); i++) {
-                JSONObject c = list.optJSONObject(i);
-                if (c != null) cards.add(c);
-            }
+            SharedPreferences p = context.getSharedPreferences(FlashWidgetProvider.PREFS, Context.MODE_PRIVATE);
+            cards.addAll(FlashWidgetProvider.readCards(p));
+            flippedId = p.getString(FlashWidgetProvider.KEY_FLIPPED, "");
+            tapHint = p.getString("w_tap_hint", "");
         } catch (Exception e) {
-            Log.e(TAG, "parse cards", e);
+            Log.e(TAG, "onDataSetChanged", e);
             cards.clear();
         }
     }
@@ -57,23 +59,31 @@ class FlashWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
 
     @Override
     public RemoteViews getViewAt(int position) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.flash_widget_item);
-        if (position < 0 || position >= cards.size()) return v;
+        if (position < 0 || position >= cards.size()) {
+            return new RemoteViews(context.getPackageName(), R.layout.flash_widget_card_front);
+        }
+        JSONObject c = cards.get(position);
+        String id = c.optString("id");
+        boolean flipped = !id.isEmpty() && id.equals(flippedId);
+        RemoteViews v = new RemoteViews(context.getPackageName(),
+                flipped ? R.layout.flash_widget_card_back : R.layout.flash_widget_card_front);
         try {
-            JSONObject c = cards.get(position);
-            String topicId = c.optString("topicId");
-            String topicTitle = c.optString("topicTitle");
-            v.setTextViewText(R.id.item_word, c.optString("word"));
-            v.setTextViewText(R.id.item_pronunciation, c.optString("pronunciation"));
-            v.setTextViewText(R.id.item_meaning, c.optString("meaning"));
+            v.setTextViewText(R.id.card_word, c.optString("word"));
+            if (flipped) {
+                String pos = c.optString("partOfSpeech");
+                v.setTextViewText(R.id.card_pos, pos);
+                v.setViewVisibility(R.id.card_pos, pos.isEmpty() ? View.GONE : View.VISIBLE);
+                v.setTextViewText(R.id.card_pronunciation, c.optString("pronunciation"));
+                v.setTextViewText(R.id.card_meaning, c.optString("meaning"));
+            } else {
+                v.setTextViewText(R.id.card_hint, tapHint);
+            }
 
-            // Template không có data → data của fill-in được giữ, Dart đọc chủ đề từ URI này.
+            // Chạm thẻ → broadcast FLIP về FlashWidgetProvider (template), không mở app.
             Intent fill = new Intent()
-                    .putExtra("topicId", topicId)
-                    .putExtra("topicTitle", topicTitle)
-                    .setData(Uri.parse("flashwidget://study?topic=" + Uri.encode(topicId)
-                            + "&title=" + Uri.encode(topicTitle)));
-            v.setOnClickFillInIntent(R.id.widget_item, fill);
+                    .putExtra(FlashWidgetProvider.EXTRA_CARD_ID, id)
+                    .putExtra(FlashWidgetProvider.EXTRA_POSITION, position);
+            v.setOnClickFillInIntent(R.id.widget_card, fill);
         } catch (Exception e) {
             Log.e(TAG, "getViewAt", e);
         }
@@ -85,9 +95,10 @@ class FlashWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
         return null; // dùng giao diện "đang tải" mặc định
     }
 
+    /** Mặt trước và mặt sau. */
     @Override
     public int getViewTypeCount() {
-        return 1;
+        return 2;
     }
 
     @Override

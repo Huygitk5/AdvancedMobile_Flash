@@ -100,7 +100,7 @@ class HomeWidgetService {
     });
   }
 
-  static const _cardColumns = 'SELECT f.id, f.word, f.pronunciation, f.meaning, f.topic_id, t.title AS topic_title ';
+  static const _cardColumns = 'SELECT f.id, f.word, f.part_of_speech, f.pronunciation, f.meaning, f.topic_id, t.title AS topic_title ';
 
   /// Hợp các nguồn đang bật trong [config], bỏ trùng theo flashcard_id, tối đa [limit] thẻ. Thứ tự:
   /// 1. Nguồn mặc định: thẻ chưa nhớ (is_learned = 0; đã đến hạn trước, rồi theo due_at),
@@ -214,6 +214,7 @@ class HomeWidgetService {
           (r) => {
             'id': r.read<String>('id'),
             'word': r.read<String>('word'),
+            'partOfSpeech': r.read<String>('part_of_speech'),
             'pronunciation': r.read<String>('pronunciation'),
             'meaning': r.read<String>('meaning'),
             'topicId': r.read<String>('topic_id'),
@@ -261,6 +262,7 @@ class HomeWidgetService {
         // Tắt: không truy vấn gì, widget chỉ hiện thông báo "chạm để bật".
         await w.save('w_enabled', '0');
         await w.save('cards', '[]');
+        await w.save('w_flipped_id', '');
         await w.save('w_count_label', '');
         await w.save('w_empty', tr('Widget đang tắt – chạm để bật'));
         await w.update();
@@ -270,6 +272,10 @@ class HomeWidgetService {
       final snap = await load(db, nowMs: Clock.nowMs(), config: cfg);
       await w.save('w_enabled', '1');
       await w.save('cards', snap.cardsJson);
+      // Danh sách mới → úp mọi thẻ. w_index (int) do native quản lý, tự về 0 nếu vượt số thẻ.
+      await w.save('w_flipped_id', '');
+      await w.save('w_tap_hint', tr('Chạm để lật'));
+      await w.save('w_swipe_hint', tr('Vuốt lên để đổi từ'));
       await w.save(
         'w_count_label',
         snap.dueCount > 0
