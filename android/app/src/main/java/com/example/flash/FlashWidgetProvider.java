@@ -91,7 +91,6 @@ public class FlashWidgetProvider extends AppWidgetProvider {
             p.edit().putInt(KEY_CARDS_HASH, hash).putInt(KEY_INDEX, clamped).putBoolean(KEY_FLIPPED, false).apply();
         }
 
-        v.setTextViewText(R.id.widget_count, enabled ? p.getString("w_count_label", "") : "");
 
         if (!enabled || n == 0) {
             // Tắt / không có từ: chỉ hiện thông báo, ẩn thẻ và thanh dưới.

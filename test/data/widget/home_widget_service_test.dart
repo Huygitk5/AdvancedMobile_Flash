@@ -199,7 +199,7 @@ void main() {
       expect(writer.updates, 1);
     });
 
-    test('widget bật: gửi thẻ và nhãn "N từ" khi không có thẻ đến hạn', () async {
+    test('widget bật: gửi thẻ, không gửi nhãn đếm', () async {
       await addCard('f1');
       await addCard('f2');
       final writer = _FakeWriter();
@@ -208,7 +208,7 @@ void main() {
 
       expect(writer.data['w_enabled'], '1');
       expect((jsonDecode(writer.data['cards']!) as List).length, 2);
-      expect(writer.data['w_count_label'], '2 từ');
+      expect(writer.data.containsKey('w_count_label'), isFalse);
       expect(writer.data['w_tap_hint'], 'Chạm để lật');
       expect(writer.updates, 1);
     });

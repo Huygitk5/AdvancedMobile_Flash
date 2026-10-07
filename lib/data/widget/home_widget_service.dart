@@ -262,7 +262,6 @@ class HomeWidgetService {
         // Tắt: không truy vấn gì, widget chỉ hiện thông báo "chạm để bật".
         await w.save('w_enabled', '0');
         await w.save('cards', '[]');
-        await w.save('w_count_label', '');
         await w.save('w_empty', tr('Widget đang tắt – chạm để bật'));
         await w.update();
         return;
@@ -273,12 +272,6 @@ class HomeWidgetService {
       await w.save('cards', snap.cardsJson);
       // w_index / w_flipped do native quản lý: native thấy "cards" đổi thì kẹp vị trí và úp thẻ.
       await w.save('w_tap_hint', tr('Chạm để lật'));
-      await w.save(
-        'w_count_label',
-        snap.dueCount > 0
-            ? trf('{n} thẻ cần ôn', {'n': snap.dueCount})
-            : trf('{n} từ', {'n': snap.cards.length}),
-      );
       await w.save('w_empty', tr('Không có từ nào'));
       await w.update();
     } catch (e) {

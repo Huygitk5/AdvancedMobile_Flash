@@ -33,14 +33,6 @@
             android:textColor="#FF4F46E5"
             android:maxLines="1"
             android:ellipsize="end" />
-        <TextView
-            android:id="@+id/widget_count"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:textSize="11sp"
-            android:textColor="#FF6B7280"
-            android:maxLines="1" />
     </LinearLayout>
 
     <FrameLayout

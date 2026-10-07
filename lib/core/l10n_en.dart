@@ -572,7 +572,6 @@ const Map<String, String> enTranslations = {
   'Cần chọn ít nhất một nguồn từ vựng': 'Keep at least one word source',
   'Chưa chọn chủ đề nào, nguồn này đang trống.': 'No topic selected, this source is empty.',
   'Widget sẽ hiện {n} từ': 'The widget will show {n} words',
-  '{n} thẻ cần ôn': '{n} cards to review',
   'Widget đang tắt – chạm để bật': 'Widget is off – tap to turn on',
   'Không có từ nào': 'No words',
   'Chạm để lật': 'Tap to flip',
