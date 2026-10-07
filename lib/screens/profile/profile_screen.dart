@@ -15,6 +15,7 @@ import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/feedback_dialog.dart';
+import '../../widgets/text_edit_dialog.dart';
 import 'my_feedback_screen.dart';
 import 'saved_words_screen.dart';
 import 'settings_screen.dart';
@@ -41,40 +42,16 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showEditSloganDialog(UserModel user) {
-    final controller = TextEditingController(text: user.slogan);
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(tr('Cập nhật Slogan'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          maxLength: 30,
-          decoration: InputDecoration(
-            hintText: tr('Nhập câu châm ngôn của bạn...'),
-            filled: true,
-            fillColor: Theme.of(dialogContext).brightness == Brightness.dark ? const Color(0xFF273449) : const Color(0xFFF4F6FA),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(tr('Hủy'), style: const TextStyle(color: AppTheme.greyColor))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              // Ghi user_profile (is_dirty) + PROFILE_UPDATE {slogan, baseVersion, clientUpdatedAt};
-              // xung đột phiên bản do SyncWorker xử lý.
-              ref.read(profileRepositoryProvider).updateSlogan(controller.text.trim());
-            },
-            child: Text(tr('Lưu'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    ).then((_) => controller.dispose());
+    showTextEditDialog(
+      context,
+      title: tr('Cập nhật Slogan'),
+      hint: tr('Nhập câu châm ngôn của bạn...'),
+      initialText: user.slogan,
+      maxLength: 30,
+      // Ghi user_profile (is_dirty) + PROFILE_UPDATE {slogan, baseVersion, clientUpdatedAt};
+      // xung đột phiên bản do SyncWorker xử lý.
+      onSave: (text) => ref.read(profileRepositoryProvider).updateSlogan(text.trim()),
+    );
   }
 
   @override
