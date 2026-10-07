@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../data/widget/home_widget_service.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/providers.dart';
 import '../../widgets/common.dart';
 import '../splash/server_settings_dialog.dart';
 import 'change_password_screen.dart';
+import 'widget_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -131,6 +133,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildDivider(),
                       _buildListTile(Icons.lock_outline, tr('Đổi mật khẩu'),
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
+                      // Widget màn hình chính chỉ có trên Android.
+                      if (HomeWidgetService.supported) ...[
+                        _buildDivider(),
+                        _buildListTile(Icons.widgets_outlined, tr('Widget màn hình chính'),
+                            onTap: () => Navigator.push(
+                                context, MaterialPageRoute(builder: (_) => const WidgetSettingsScreen()))),
+                      ],
                       // _buildDivider(),
                       // _buildListTile(Icons.dns_outlined, tr('Địa chỉ máy chủ'),
                       //     trailingText: Uri.tryParse(AppConfig.apiBaseUrl)?.host ?? '', onTap: () async {

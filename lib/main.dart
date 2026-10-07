@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import 'core/speech.dart';
 import 'core/theme.dart';
 import 'data/local/app_database.dart';
 import 'data/sync/background_sync.dart';
+import 'data/widget/home_widget_service.dart';
 import 'data/storage/app_prefs.dart';
 import 'providers/providers.dart';
 
@@ -24,6 +27,8 @@ Future<void> main() async {
 
   final db = AppDatabase();
   await BackgroundSync.initialize();
+  HomeWidgetService.watch(db);
+  unawaited(HomeWidgetService.refresh(db)); // cập nhật widget ngay khi mở app
 
   runApp(ProviderScope(
     overrides: [

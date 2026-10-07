@@ -555,6 +555,27 @@ const Map<String, String> enTranslations = {
       'Have you studied today?\nDon\'t forget to finish a lesson\nto keep your streak!',
   'Để sau': 'Later',
 
+  // --- Widget màn hình chính
+  'Ôn từ ngay trên màn hình chính': 'Review words right on your home screen',
+  'Lật thẻ cần ôn mà không cần mở app.': 'Flip your due cards without opening the app.',
+  'Thêm widget': 'Add widget',
+  'Thêm widget ra màn hình chính': 'Add widget to home screen',
+  'Không thêm được widget': 'Couldn\'t add the widget',
+  'Widget màn hình chính': 'Home screen widget',
+  'Bật widget': 'Enable widget',
+  'Tắt thì widget ngừng hiện từ. Muốn gỡ hẳn, hãy gỡ trên màn hình chính.':
+      'When off, the widget stops showing words. To remove it, remove it from your home screen.',
+  'Nguồn từ vựng': 'Word sources',
+  'Từ chưa nhớ và ôn hôm nay': 'Unlearned words & today\'s reviews',
+  'Chủ đề đã chọn': 'Selected topics',
+  'Đã chọn {n} chủ đề': '{n} topics selected',
+  'Cần chọn ít nhất một nguồn từ vựng': 'Keep at least one word source',
+  'Chưa chọn chủ đề nào, nguồn này đang trống.': 'No topic selected, this source is empty.',
+  'Widget sẽ hiện {n} từ': 'The widget will show {n} words',
+  'Widget đang tắt – chạm để bật': 'Widget is off – tap to turn on',
+  'Không có từ nào': 'No words',
+  'Chạm để lật': 'Tap to flip',
+
   // --- Góp ý của user
   'Flashcard': 'Flashcard',
   'Grammar': 'Grammar',

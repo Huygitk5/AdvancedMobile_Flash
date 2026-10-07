@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../../core/config.dart';
+import '../../core/l10n.dart';
 import '../local/app_database.dart';
 import '../remote/api_client.dart';
 import '../remote/apis/sync_api.dart';
 import '../storage/app_prefs.dart';
 import '../storage/secure_store.dart';
+import '../widget/home_widget_service.dart';
 import 'op_handlers.dart';
 import 'pull_service.dart';
 import 'sync_worker.dart';
@@ -61,6 +63,7 @@ void backgroundSyncDispatcher() {
     final db = AppDatabase();
     try {
       final prefs = await AppPrefs.load();
+      AppLocale.apply(prefs.appLanguage); // nhãn chữ gửi sang widget theo ngôn ngữ app
       await AppConfig.load();
       final store = SecureStore();
       if (await store.refreshToken() == null || await store.userRole() == 'ADMIN') return true;
@@ -75,6 +78,7 @@ void backgroundSyncDispatcher() {
         pull: PullService(db: db, api: api, onPulled: prefs.setLastSyncedTimestamp),
       );
       await worker.syncNow();
+      await HomeWidgetService.refresh(db);
       worker.dispose();
       return true;
     } catch (e) {

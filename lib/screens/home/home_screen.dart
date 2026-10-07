@@ -1,16 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 
 import '../../core/clock.dart';
 import '../../core/icons.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../data/local/converters.dart';
+import '../../data/widget/home_widget_service.dart';
 import '../../models/lesson_model.dart';
 import '../../models/quest_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
+import '../../widgets/add_home_widget_card.dart';
 import '../../widgets/common.dart';
 import '../../widgets/reminder_dialog.dart';
 import '../challenge/challenge_screen.dart';
@@ -19,6 +24,7 @@ import '../grammar/grammar_detail_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../profile/profile_screen.dart' show borderColorsOf;
 import '../profile/settings_screen.dart';
+import '../profile/widget_settings_screen.dart';
 import '../vocabulary/topic_screen.dart';
 
 /// Mọi số liệu đọc từ SQLite nên mở offline vẫn hiển thị đủ.
@@ -30,7 +36,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  static bool _handledLaunch = false; // chỉ xử lý "mở app từ widget" một lần
+  StreamSubscription<Uri?>? _widgetClicks;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +52,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ReminderDialog.maybeShowDaily(context, ref.read(appPrefsProvider),
           studiedToday: (today?.lessonsCompleted ?? 0) + (today?.cardsReviewed ?? 0) > 0);
     });
+    WidgetsBinding.instance.addObserver(this);
+    if (HomeWidgetService.supported) {
+      if (!_handledLaunch) {
+        _handledLaunch = true;
+        HomeWidget.initiallyLaunchedFromHomeWidget().then(_openFromWidget, onError: (_) {}); // app đang tắt
+      }
+      _widgetClicks = HomeWidget.widgetClicked.listen(_openFromWidget, onError: (_) {}); // app đang chạy nền
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _widgetClicks?.cancel();
+    super.dispose();
+  }
+
+  // Quay lại app sau một lúc → có thể đã có thêm thẻ đến hạn.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      HomeWidgetService.refresh(ref.read(dbProvider));
+    }
+  }
+
+  // Đường dẫn widget gửi về: flashwidget://study?topic=<id>&title=<tên>,
+  // hoặc flashwidget://settings/widget khi widget đang tắt.
+  void _openFromWidget(Uri? uri) {
+    if (uri == null || !mounted) return;
+    if (uri.host == 'settings') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const WidgetSettingsScreen()));
+      return;
+    }
+    final topicId = uri.queryParameters['topic'];
+    if (topicId == null || topicId.isEmpty) return; // chạm khi không có thẻ: chỉ mở app
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FlashcardScreen(topicId: topicId, topicTitle: uri.queryParameters['title'] ?? ''),
+      ),
+    );
   }
 
   @override
@@ -59,6 +109,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Gợi ý đặt widget ra màn hình chính (tự ẩn nếu không phải Android / đã bấm).
+                const AddHomeWidgetCard(),
                 _buildHeader(context, user),
                 const SizedBox(height: 25),
                 _buildProgressSection(context),
