@@ -24,25 +24,13 @@ class WidgetSnapshot {
 class HomeWidgetService {
   HomeWidgetService._();
 
-  static const appGroupId = 'group.com.example.flash'; // phải trùng App Group trên iOS
   static const _androidName = 'FlashWidgetProvider'; // tên lớp Java (FlashWidgetProvider.java)
-  static const _iosName = 'FlashWidget'; // "kind" của widget Swift (ios/FlashWidget/FlashWidget.swift)
   static const _limit = 10;
 
-  /// Chỉ Android/iOS có widget; nơi khác (web, desktop, test) bỏ qua mọi lệnh gọi plugin.
-  static bool get supported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  /// Widget chỉ có trên Android; nơi khác (iOS, web, desktop, test) bỏ qua mọi lệnh gọi plugin.
+  static bool get supported => !kIsWeb && Platform.isAndroid;
   static StreamSubscription<void>? _sub;
   static Timer? _debounce;
-
-  /// Gọi một lần trong main(), trước mọi lệnh lưu dữ liệu. Android bỏ qua lệnh này.
-  static Future<void> init() async {
-    if (!supported) return;
-    try {
-      await HomeWidget.setAppGroupId(appGroupId);
-    } catch (e) {
-      debugPrint('HomeWidgetService.init: $e');
-    }
-  }
 
   /// Tự cập nhật widget mỗi khi bảng tiến độ thay đổi (ôn thẻ, kéo dữ liệu về, đăng xuất...).
   static void watch(AppDatabase db) {
@@ -153,7 +141,7 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>('w_tap_hint', 'Chạm để xem nghĩa');
       await HomeWidget.saveWidgetData<String>('w_empty_title', 'Không có thẻ cần ôn');
       await HomeWidget.saveWidgetData<String>('w_empty_hint', 'Chạm để mở app học từ mới');
-      await HomeWidget.updateWidget(androidName: _androidName, iOSName: _iosName);
+      await HomeWidget.updateWidget(androidName: _androidName);
     } catch (e) {
       debugPrint('HomeWidgetService.refresh: $e'); // widget lỗi không được làm hỏng app
     }

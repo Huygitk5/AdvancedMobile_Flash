@@ -27,7 +27,6 @@ Future<void> main() async {
 
   final db = AppDatabase();
   await BackgroundSync.initialize();
-  await HomeWidgetService.init();
   HomeWidgetService.watch(db);
   unawaited(HomeWidgetService.refresh(db)); // cập nhật widget ngay khi mở app
 
