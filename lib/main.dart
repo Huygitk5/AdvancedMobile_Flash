@@ -1,23 +1,40 @@
-import 'package:flash/screens/splash/welcome_screen.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app.dart';
+import 'core/config.dart';
+import 'core/l10n.dart';
+import 'core/speech.dart';
 import 'core/theme.dart';
-import 'screens/main/main_screen.dart';
-import 'screens/splash/welcome_screen.dart';
+import 'data/local/app_database.dart';
+import 'data/sync/background_sync.dart';
+import 'data/widget/home_widget_service.dart';
+import 'data/storage/app_prefs.dart';
+import 'providers/providers.dart';
 
-void main() {
-  runApp(const FlashApp());
-}
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-class FlashApp extends StatelessWidget {
-  const FlashApp({Key? key}) : super(key: key);
+  // Đọc cài đặt TRƯỚC runApp để theme đúng ngay khung hình đầu tiên (không bị nháy).
+  final prefs = await AppPrefs.load();
+  themeNotifier.value = prefs.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+  AppLocale.apply(prefs.appLanguage);
+  SpeechService.soundEnabled = prefs.isSoundEnabled;
+  // Địa chỉ máy chủ người dùng tự nhập (nếu có) phải nạp trước khi dựng ApiClient.
+  await AppConfig.load();
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flash English',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      home: const WelcomeScreen(), // Bỏ qua Welcome để test nhanh UI chính
-    );
-  }
+  final db = AppDatabase();
+  await BackgroundSync.initialize();
+  HomeWidgetService.watch(db);
+  unawaited(HomeWidgetService.refresh(db)); // cập nhật widget ngay khi mở app
+
+  runApp(ProviderScope(
+    overrides: [
+      appPrefsProvider.overrideWithValue(prefs),
+      dbProvider.overrideWithValue(db),
+    ],
+    child: const FlashApp(),
+  ));
 }

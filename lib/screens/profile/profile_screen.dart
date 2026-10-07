@@ -1,115 +1,457 @@
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
-import 'settings_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+import '../../core/icons.dart';
+import '../../core/l10n.dart';
+import '../../core/speech.dart';
+import '../../core/theme.dart';
+import '../../models/flashcard_model.dart';
+import '../../models/reward_item_model.dart';
+import '../../models/saved_word_topic_model.dart';
+import '../../models/user_model.dart';
+import '../../providers/content_providers.dart';
+import '../../providers/feedback_providers.dart';
+import '../../providers/providers.dart';
+import '../../providers/user_providers.dart';
+import '../../widgets/common.dart';
+import '../../widgets/feedback_dialog.dart';
+import '../../widgets/text_edit_dialog.dart';
+import 'my_feedback_screen.dart';
+import 'saved_words_screen.dart';
+import 'settings_screen.dart';
+import 'shop_screen.dart';
+
+/// Kho đồ của user (chỉ món đã sở hữu), đọc từ SQLite.
+final _inventoryProvider = StreamProvider.autoDispose<List<RewardItem>>(
+  (ref) => ref.watch(dbProvider).shopDao.watchInventoryWithItems(),
+);
+
+/// Viền mặc định của "Tân binh" khi chưa trang bị viền nào.
+const defaultBorderColors = [Color(0xFFE2E8F0), Color(0xFFCBD5E1)];
+
+/// ARGB -> Color, rỗng thì dùng viền mặc định.
+List<Color> borderColorsOf(List<int> argb) =>
+    argb.isEmpty ? defaultBorderColors : argb.map((c) => Color(c)).toList();
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  void _showEditSloganDialog(UserModel user) {
+    showTextEditDialog(
+      context,
+      title: tr('Cập nhật Slogan'),
+      hint: tr('Nhập câu châm ngôn của bạn...'),
+      initialText: user.slogan,
+      maxLength: 30,
+      // Ghi user_profile (is_dirty) + PROFILE_UPDATE {slogan, baseVersion, clientUpdatedAt};
+      // xung đột phiên bản do SyncWorker xử lý.
+      onSave: (text) => ref.read(profileRepositoryProvider).updateSlogan(text.trim()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(profileProvider).value;
+    if (user == null) return const Scaffold(body: LoadingView());
+    final rank = ref.watch(leaderboardProvider('XP')).value?.me?.rank;
+    final cardColor = Theme.of(context).cardColor;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F6FA),
+        automaticallyImplyLeading: false,
         elevation: 0,
-        title: const Text('Hồ sơ cá nhân', style: TextStyle(color: Color(0xFF1E293B), fontSize: 22, fontWeight: FontWeight.bold)),
-        centerTitle: false,
+        title: Text(tr('Hồ sơ cá nhân'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Color(0xFF1E293B)),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
-            },
-          )
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          ),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              // Thẻ thông tin User
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 35,
-                          backgroundColor: Color(0xFFEEF2FF),
-                          child: Icon(Icons.person, size: 40, color: AppTheme.primaryColor),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Đoàn Quốc Huy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                              SizedBox(height: 5),
-                              Text('huy_dev@gmail.com', style: TextStyle(color: AppTheme.greyColor, fontSize: 14)),
-                              SizedBox(height: 10),
-                              Text('A2', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 20)),
-                            ],
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(leaderboardProvider('XP'));
+            ref.invalidate(feedbackSummaryProvider);
+            await ref.read(syncWorkerProvider).syncNow();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 100 + MediaQuery.of(context).padding.bottom),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          UserAvatar(
+                            size: 78,
+                            ringWidth: 4,
+                            borderColors: borderColorsOf(user.equippedBorderColors),
+                            imageUrl: user.equippedAvatarUrl ?? user.avatarUrl,
+                            initials: initialsOf(user.fullName),
                           ),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('120 / 600 XP', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: 120 / 600,
-                      backgroundColor: Colors.grey.shade200,
-                      color: AppTheme.primaryColor,
-                      minHeight: 6,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ],
+                          const SizedBox(width: 18),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(user.fullName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    ),
+                                    if (rank != null) ...[
+                                      const SizedBox(width: 8),
+                                      // Flexible + ellipsis: badge co lại trên màn hẹp / cỡ chữ lớn thay vì tràn
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(10)),
+                                          child: Text(
+                                            rank <= 10 ? trf('Top {n} Point', {'n': rank}) : trf('Hạng #{n}', {'n': rank}),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(user.email,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.greyColor, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                GestureDetector(
+                                  onTap: () => _showEditSloganDialog(user),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          user.slogan.isEmpty ? tr('Thêm câu châm ngôn') : user.slogan,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: AppTheme.primaryColor, fontSize: 13, fontStyle: FontStyle.italic),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.edit, size: 14, color: AppTheme.primaryColor),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Text(user.level,
+                                        style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.stars, color: Colors.amber, size: 16),
+                                            const SizedBox(width: 4),
+                                            // XP để mua sắm = số server xác nhận + phần chờ đồng bộ
+                                            Text('${user.displayXp} XP',
+                                                style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFF7E6),
+                            foregroundColor: Colors.orange,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          ),
+                          icon: const Icon(Icons.storefront),
+                          label: Text(tr('Cửa hàng đổi thưởng'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          // Profile watch SQLite nên tự cập nhật XP / viền mới khi quay về.
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen())),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Thẻ thống kê
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildStatTile(Icons.local_fire_department, Colors.orange, tr('Streak'), trf('{n} ngày', {'n': user.streakDays})),
+                      _divider(),
+                      _buildStatTile(Icons.menu_book, Colors.green, tr('Tổng số từ đã học'), '${user.totalWordsLearned}'),
+                      _divider(),
+                      _buildStatTile(Icons.task_alt, Colors.blue, tr('Số bài hoàn thành'), '${user.completedLessons}'),
+                      _divider(),
+                      _buildStatTile(Icons.emoji_events_outlined, Colors.amber, tr('Tổng XP tích luỹ'), '${user.totalLifetimeXp}'),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildStatTile(Icons.local_fire_department, Colors.orange, 'Streak', '7 ngày'),
-                    const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
-                    _buildStatTile(Icons.menu_book, Colors.green, 'Tổng số từ đã học', '248'),
-                    const Divider(height: 1, indent: 50, endIndent: 20, color: Color(0xFFF4F6FA)),
-                    _buildStatTile(Icons.task_alt, Colors.blue, 'Số bài học hoàn thành', '18'),
-                  ],
-                ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                _buildSavedWords(context),
+                const SizedBox(height: 20),
+                _buildMyFeedback(context),
+                const SizedBox(height: 20),
+                _buildInventory(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _divider() => Divider(height: 1, indent: 50, endIndent: 20, color: Theme.of(context).scaffoldBackgroundColor);
+
   Widget _buildStatTile(IconData icon, Color iconColor, String title, String value) {
     return ListTile(
       leading: Icon(icon, color: iconColor),
-      title: Text(title, style: const TextStyle(fontSize: 15, color: Color(0xFF1E293B))),
-      trailing: Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+      title: Text(title, style: const TextStyle(fontSize: 15)),
+      trailing: Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  /// Các topic có từ đã lưu, bấm "Xem tất cả" để mở đầy đủ và lọc/tìm kiếm.
+  Widget _buildSavedWords(BuildContext context) {
+    final topicsAsync = ref.watch(savedWordTopicsProvider);
+    final topics = topicsAsync.value ?? const <SavedWordTopic>[];
+    final total = topics.fold<int>(0, (sum, topic) => sum + topic.wordCount);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.bookmark, color: Colors.amber),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  trf('Từ đã lưu ({n})', {'n': total}),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (topics.isNotEmpty)
+                TextButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedWordsScreen())),
+                  child: Text(tr('Xem tất cả'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (topicsAsync.isLoading && topics.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (topics.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(tr('Chưa có từ nào được lưu. Bấm biểu tượng dấu trang trên thẻ từ vựng để lưu.'),
+                  style: const TextStyle(color: AppTheme.greyColor, fontSize: 13, height: 1.4)),
+            )
+          else
+            ...topics.take(5).map((topic) => _savedTopicRow(context, topic)),
+        ],
+      ),
+    );
+  }
+
+  /// Góp ý của tôi: số lượng theo loại (ẩn khi chưa tải được / offline), bấm để xem danh sách đã lọc sẵn.
+  Widget _buildMyFeedback(BuildContext context) {
+    final summary = ref.watch(feedbackSummaryProvider).value;
+    void open(FeedbackType? type) =>
+        Navigator.push(context, MaterialPageRoute(builder: (_) => MyFeedbackScreen(initialType: type)));
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.feedback_outlined, color: AppTheme.primaryColor),
+              const SizedBox(width: 8),
+              Expanded(child: Text(tr('Góp ý của tôi'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+              TextButton(
+                onPressed: () => open(null),
+                child: Text(tr('Xem tất cả'), style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final type in FeedbackType.values)
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => open(type),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(
+                  children: [
+                    Icon(type.icon, size: 20, color: AppTheme.greyColor),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(type.label, style: const TextStyle(fontSize: 15))),
+                    if (summary != null && summary.countOf(type) > 0) ...[
+                      Text('${summary.countOf(type)}',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                      const SizedBox(width: 6),
+                    ],
+                    const Icon(Icons.chevron_right, size: 20, color: AppTheme.greyColor),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _savedTopicRow(BuildContext context, SavedWordTopic topic) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SavedWordsScreen(initialTopicId: topic.topicId),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: isIconName(topic.iconPath)
+                  ? Icon(
+                      iconFor(topic.iconPath),
+                      color: AppTheme.primaryColor,
+                      size: 19,
+                    )
+                  : Text(topic.iconPath, style: const TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                topic.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              trf('{n} từ', {'n': topic.wordCount}),
+              style: const TextStyle(color: AppTheme.greyColor, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Kho đồ: chạm để trang bị (ITEM_EQUIP), giống Shop.
+  Widget _buildInventory() {
+    final items = ref.watch(_inventoryProvider).value ?? const <RewardItem>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(tr('Kho đồ'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (context, i) {
+                final item = items[i];
+                return GestureDetector(
+                  onTap: item.isEquipped ? null : () => ref.read(shopRepositoryProvider).setEquipped(item, true),
+                  child: Column(children: [
+                    UserAvatar(
+                      size: 54,
+                      ringWidth: 3,
+                      borderColors: borderColorsOf(item.borderColors),
+                      imageUrl: item.isAvatar ? item.imageUrl : null,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(item.isEquipped ? tr('Đang dùng') : item.name,
+                        style: TextStyle(fontSize: 11, color: item.isEquipped ? Colors.green : AppTheme.greyColor, fontWeight: FontWeight.bold)),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

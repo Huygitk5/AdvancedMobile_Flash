@@ -1,0 +1,88 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      # Luôn trả "application/json;charset=UTF-8": package http của Dart đọc Latin-1 nếu thiếu charset
+      charset: UTF-8
+      force-response: true
+
+spring:
+  application:
+    name: flash-backend
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:flash_db}?createDatabaseIfNotExist=true&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # schema do Flyway quản lý, Hibernate chỉ kiểm tra khớp
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+  flyway:
+    enabled: true
+    # db/migration: schema + seed nhỏ (V1-V3); db/seed: bộ từ vựng / ngữ pháp đầy đủ (V4+)
+    locations: classpath:db/migration,classpath:db/seed
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+    default-property-inclusion: non_null
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
+  # Gửi OTP qua email: đặt SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD.
+  # Không đặt thì OTP chỉ được in ra log (dev). Gmail: smtp.gmail.com / 587 + App Password.
+  mail:
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    persist-authorization: true
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  cors:
+    # Các origin được gọi API từ trình duyệt (Flutter Web, Swagger UI), cách nhau bằng dấu phẩy; mặc định mọi origin
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-change-me-in-production-0123456789}
+    issuer: flash-backend
+    access-token-ttl: PT15M
+    refresh-token-ttl: P30D
+  auth:
+    # Bật xác thực email bằng OTP khi đăng ký và đổi mật khẩu (tắt: REQUIRE_EMAIL_VERIFICATION=false)
+    require-email-verification: ${REQUIRE_EMAIL_VERIFICATION:true}
+    otp-ttl: PT10M
+    otp-max-attempts: 5
+    otp-resend-interval: PT60S
+    rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}
+  google:
+    # OAuth client id của app (Web + Android), cách nhau bằng dấu phẩy. Client ID không phải bí mật nên để mặc định ở đây
+    client-ids: ${GOOGLE_CLIENT_IDS:887843851502-bqhkmojl022pbhob1hgeerk8ejaj5tcj.apps.googleusercontent.com,887843851502-kmi9207u754srhvfgadfacr1v9ec7bgn.apps.googleusercontent.com}
+  sync:
+    rate-limit-per-minute: ${SYNC_RATE_LIMIT_PER_MINUTE:30}
+    cleanup-cron: "0 30 3 * * *"   # dọn sync_operations > 30 ngày, 03:30 UTC mỗi ngày
+  mail:
+    from: ${MAIL_FROM:no-reply@flash.local}
+  bootstrap-admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+
+logging:
+  level:
+    com.flash: DEBUG

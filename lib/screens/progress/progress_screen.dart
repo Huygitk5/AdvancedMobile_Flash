@@ -1,325 +1,313 @@
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProgressScreen extends StatefulWidget {
-  const ProgressScreen({Key? key}) : super(key: key);
+import '../../core/clock.dart';
+import '../../core/l10n.dart';
+import '../../core/theme.dart';
+import '../../core/utils.dart';
+import '../../models/daily_statistic_model.dart';
+import '../../providers/providers.dart';
+import '../../providers/user_providers.dart';
+import '../../widgets/common.dart';
+import 'chart_data.dart';
+import 'line_chart.dart';
+
+class ProgressScreen extends ConsumerStatefulWidget {
+  const ProgressScreen({super.key});
 
   @override
-  State<ProgressScreen> createState() => _ProgressScreenState();
+  ConsumerState<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-class _ProgressScreenState extends State<ProgressScreen> {
-  String selectedFilter = 'Tuần';
-  final List<String> filters = ['Tuần', 'Tháng', 'Tất cả'];
+/// Biểu đồ đọc `daily_statistics` từ SQLite (offline được), lọc theo khoảng bằng [Statistics.of].
+class _ProgressScreenState extends ConsumerState<ProgressScreen> {
+  StatsRange _range = StatsRange.week;
+  DateTimeRange? _customRange;
+
+  void _select(StatsRange range) {
+    if (range == StatsRange.custom) {
+      _pickRange();
+      return;
+    }
+    setState(() => _range = range);
+  }
+
+  Future<void> _pickRange() async {
+    final today = dateOnly(Clock.now());
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(today.year - 3),
+      lastDate: today,
+      initialDateRange: _customRange ?? DateTimeRange(start: today.subtract(const Duration(days: 29)), end: today),
+      locale: AppLocale.locale,
+      helpText: tr('Chọn khoảng ngày'),
+      saveText: tr('Áp dụng'),
+    );
+    if (picked == null || !mounted) return;
+    if (picked.end.difference(picked.start).inDays + 1 > Statistics.maxCustomDays) {
+      showAppSnack(context, tr('Khoảng ngày tối đa 366 ngày'), error: true);
+      return;
+    }
+    setState(() {
+      _customRange = DateTimeRange(start: dateOnly(picked.start), end: dateOnly(picked.end));
+      _range = StatsRange.custom;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final all = ref.watch(statsRangeProvider('ALL'));
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA), // Nền xám nhạt đồng bộ
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F6FA),
         elevation: 0,
-        title: const Text(
-          'Tiến độ học tập',
-          style: TextStyle(color: Color(0xFF1E293B), fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: false,
-        automaticallyImplyLeading: false, // Bỏ nút back vì đây là màn hình chính
+        title: Text(tr('Tiến độ'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
-            children: [
-              _buildFilters(),
-              const SizedBox(height: 20),
-              _buildChartCard(),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(child: _buildCompletedLessonsCard()),
-                  const SizedBox(width: 15),
-                  Expanded(child: _buildStreakCard()),
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(syncWorkerProvider).syncNow(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 100 + MediaQuery.of(context).padding.bottom),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFilters(),
+                if (_range == StatsRange.custom && _customRange != null) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text('${formatDate(_customRange!.start)} - ${formatDate(_customRange!.end)}',
+                        style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 15),
-              _buildAccuracyCard(),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 18),
+                ...all.when(
+                  loading: () => [const Padding(padding: EdgeInsets.only(top: 60), child: LoadingView())],
+                  error: (e, _) => [
+                    Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: ErrorView(message: trf('Không đọc được dữ liệu: {e}', {'e': e}))),
+                  ],
+                  data: (daily) {
+                    final stats = Statistics.of(_range, daily,
+                        today: Clock.now(), customFrom: _customRange?.start, customTo: _customRange?.end);
+                    return [
+                      _buildChartCard(stats, stats.previous(daily)),
+                      const SizedBox(height: 15),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: _buildCompletedLessonsCard()),
+                            const SizedBox(width: 15),
+                            Expanded(child: _buildStreakCard()),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      _buildAccuracyCard(stats),
+                    ];
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // 1. Bộ lọc thời gian (Tuần, Tháng, Tất cả)
   Widget _buildFilters() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: filters.map((filter) {
-        bool isActive = selectedFilter == filter;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => selectedFilter = filter),
-            child: Container(
-              margin: EdgeInsets.only(right: filter != 'Tất cả' ? 10 : 0),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: isActive ? AppTheme.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isActive ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5)],
-              ),
-              child: Center(
-                child: Text(
-                  filter,
-                  style: TextStyle(
-                    color: isActive ? Colors.white : AppTheme.greyColor,
-                    fontWeight: FontWeight.bold,
+    final items = <(StatsRange, String)>[
+      (StatsRange.all, tr('Tất cả')),
+      (StatsRange.week, tr('Tuần')),
+      (StatsRange.month, tr('Tháng')),
+      (StatsRange.year, tr('Năm')),
+      (StatsRange.custom, tr('Tùy chọn')),
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => _select(item.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: _range == item.$1 ? AppTheme.primaryColor : Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: _range == item.$1 ? null : Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (item.$1 == StatsRange.custom) ...[
+                        Icon(Icons.date_range, size: 16, color: _range == item.$1 ? Colors.white : AppTheme.greyColor),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(item.$2,
+                          style: TextStyle(color: _range == item.$1 ? Colors.white : AppTheme.greyColor, fontWeight: FontWeight.bold)),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 
-  // 2. Thẻ biểu đồ chính (Số từ đã học)
-  Widget _buildChartCard() {
+  Widget _card(Widget child, {EdgeInsets padding = const EdgeInsets.all(20)}) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
       ),
-      child: Column(
+      child: child,
+    );
+  }
+
+  Widget _buildChartCard(Statistics stats, Statistics? previous) {
+    final points = buildChartPoints(_range, stats);
+    final total = points.fold<int>(0, (sum, p) => sum + p.value);
+    final delta = previous == null ? null : total - previous.wordsLearned;
+    return _card(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Số từ đã học', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(tr('Số từ đã học'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: const [
-              Text('248', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF1E293B))),
-              SizedBox(width: 10),
-              Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Text('+12 từ so với tuần trước', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-
-          // Khu vực vẽ biểu đồ (CustomPaint)
-          SizedBox(
-            height: 120,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: LineChartPainter(),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Trục X (Các thứ trong tuần)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('T2', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('T3', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('T4', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('T5', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('T6', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('T7', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-              Text('CN', style: TextStyle(color: AppTheme.greyColor, fontSize: 12)),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  // 3. Thẻ Bài học hoàn thành
-  Widget _buildCompletedLessonsCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.menu_book, color: AppTheme.primaryColor, size: 20),
-              ),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Bài học hoàn thành', style: TextStyle(color: AppTheme.greyColor, fontSize: 11))),
+              Text('$total', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+              const SizedBox(width: 10),
+              if (delta != null)
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      delta >= 0
+                          ? trf('+{n} từ so với kỳ trước', {'n': delta})
+                          : trf('{n} từ so với kỳ trước', {'n': delta}),
+                      maxLines: 2,
+                      style: TextStyle(color: delta >= 0 ? Colors.green : Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 15),
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(fontFamily: 'Roboto'),
-              children: [
-                TextSpan(text: '18 ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
-                TextSpan(text: '/ 30', style: TextStyle(fontSize: 16, color: AppTheme.greyColor, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
+          const SizedBox(height: 18),
+          if (points.every((p) => p.value == 0))
+            SizedBox(
+              height: 150,
+              child: Center(
+                child: Text(tr('Chưa có từ nào được học trong khoảng này'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+              ),
+            )
+          else
+            WordsLineChart(points: points),
         ],
       ),
     );
   }
 
-  // 4. Thẻ Streak hiện tại
-  Widget _buildStreakCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-      ),
-      child: Column(
+  Widget _buildCompletedLessonsCard() {
+    final completed = ref.watch(profileProvider).value?.completedLessons ?? 0;
+    return _card(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
-              Icon(Icons.local_fire_department, color: Colors.orange, size: 28),
-              SizedBox(width: 8),
-              Expanded(child: Text('Streak hiện tại', style: TextStyle(color: AppTheme.greyColor, fontSize: 12))),
-            ],
-          ),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.menu_book, color: AppTheme.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tr('Bài học hoàn thành'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 11))),
+          ]),
           const SizedBox(height: 15),
           RichText(
-            text: const TextSpan(
-              style: TextStyle(fontFamily: 'Roboto'),
+            text: TextSpan(
+              style: TextStyle(fontFamily: 'Roboto', color: Theme.of(context).textTheme.bodyLarge?.color),
               children: [
-                TextSpan(text: '7 ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent)),
-                TextSpan(text: 'ngày', style: TextStyle(fontSize: 16, color: Color(0xFF1E293B), fontWeight: FontWeight.w600)),
+                TextSpan(
+                    text: '$completed ',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                TextSpan(text: tr('bài'), style: const TextStyle(fontSize: 16, color: AppTheme.greyColor, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(16),
     );
   }
 
-  // 5. Thẻ Độ chính xác
-  Widget _buildAccuracyCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-      ),
-      child: Row(
+  Widget _buildStreakCard() {
+    final user = ref.watch(profileProvider).value;
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Vòng tròn phần trăm
+          Row(children: [
+            const Icon(Icons.local_fire_department, color: Colors.orange, size: 28),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tr('Streak hiện tại'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12))),
+          ]),
+          const SizedBox(height: 15),
+          RichText(
+            text: TextSpan(
+              style: TextStyle(fontFamily: 'Roboto', color: Theme.of(context).textTheme.bodyLarge?.color),
+              children: [
+                TextSpan(
+                    text: '${user?.streakDays ?? 0} ',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                TextSpan(text: tr('ngày'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+    );
+  }
+
+  Widget _buildAccuracyCard(Statistics stats) {
+    final accuracy = stats.accuracy;
+    final longest = ref.watch(profileProvider).value?.longestStreak ?? 0;
+    return _card(
+      Row(
+        children: [
           SizedBox(
             width: 60,
             height: 60,
-            child: Stack(
-              fit: StackFit.expand,
+            child: CircularProgressIndicator(
+                value: (accuracy ?? 0).clamp(0.0, 1.0), strokeWidth: 8, backgroundColor: Colors.green.shade50, color: Colors.green.shade400),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircularProgressIndicator(
-                  value: 0.85,
-                  strokeWidth: 8,
-                  backgroundColor: Colors.green.shade50,
-                  color: Colors.green.shade400,
-                ),
+                Text(tr('Độ chính xác (Quiz)'), style: const TextStyle(color: AppTheme.greyColor, fontSize: 13)),
+                const SizedBox(height: 5),
+                Text(accuracy == null ? '—' : '${(accuracy * 100).round()}%',
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                Text(trf('Streak dài nhất: {n} ngày', {'n': longest}), style: const TextStyle(color: AppTheme.greyColor, fontSize: 12)),
               ],
             ),
           ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Độ chính xác (Quiz)', style: TextStyle(color: AppTheme.greyColor, fontSize: 13)),
-              SizedBox(height: 5),
-              Text('85%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1E293B))),
-            ],
-          )
         ],
       ),
     );
   }
-}
-
-// Lớp vẽ biểu đồ giả lập dữ liệu theo thiết kế
-class LineChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintLine = Paint()
-      ..color = AppTheme.primaryColor
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // Các điểm giả lập dữ liệu: T2 đến CN
-    final points = [
-      Offset(0, size.height * 0.8),
-      Offset(size.width * 0.16, size.height * 0.5),
-      Offset(size.width * 0.33, size.height * 0.6),
-      Offset(size.width * 0.5, size.height * 0.3),
-      Offset(size.width * 0.66, size.height * 0.55),
-      Offset(size.width * 0.83, size.height * 0.2),
-      Offset(size.width, size.height * 0.05),
-    ];
-
-    final path = Path();
-    path.moveTo(points.first.dx, points.first.dy);
-
-    // Vẽ đường thẳng nối các điểm (nếu muốn đường cong bezier thì dùng quadraticBezierTo)
-    for (int i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
-    }
-
-    // Vẽ nền mờ (Gradient dưới đường line)
-    final fillPath = Path.from(path)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    final gradientPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [AppTheme.primaryColor.withOpacity(0.3), AppTheme.primaryColor.withOpacity(0.0)],
-      ).createShader(Rect.fromLTRB(0, 0, size.width, size.height));
-
-    canvas.drawPath(fillPath, gradientPaint);
-    canvas.drawPath(path, paintLine);
-
-    // Vẽ các chấm tròn trên biểu đồ
-    final dotPaint = Paint()
-      ..color = AppTheme.primaryColor
-      ..style = PaintingStyle.fill;
-    final dotBgPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    for (var point in points) {
-      canvas.drawCircle(point, 5, dotBgPaint);
-      canvas.drawCircle(point, 3, dotPaint);
-    }
-
-    // Vẽ các đường Grid ngang (đứt nét hoặc mờ)
-    final gridPaint = Paint()
-      ..color = Colors.grey.shade200
-      ..strokeWidth = 1;
-    canvas.drawLine(Offset(0, size.height * 0.5), Offset(size.width, size.height * 0.5), gridPaint);
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), gridPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
