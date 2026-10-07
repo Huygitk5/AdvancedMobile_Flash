@@ -9,6 +9,7 @@ import '../remote/api_client.dart';
 import '../remote/apis/sync_api.dart';
 import '../storage/app_prefs.dart';
 import '../storage/secure_store.dart';
+import '../widget/home_widget_service.dart';
 import 'op_handlers.dart';
 import 'pull_service.dart';
 import 'sync_worker.dart';
@@ -75,6 +76,7 @@ void backgroundSyncDispatcher() {
         pull: PullService(db: db, api: api, onPulled: prefs.setLastSyncedTimestamp),
       );
       await worker.syncNow();
+      await HomeWidgetService.refresh(db);
       worker.dispose();
       return true;
     } catch (e) {
