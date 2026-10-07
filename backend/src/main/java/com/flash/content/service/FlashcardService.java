@@ -8,6 +8,7 @@ import com.flash.content.dto.FlashcardResponse;
 import com.flash.content.entity.Flashcard;
 import com.flash.content.repository.FlashcardRepository;
 import com.flash.content.repository.TopicRepository;
+import com.flash.feedback.service.FeedbackCleanup;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class FlashcardService {
     private final FlashcardRepository flashcardRepository;
     private final TopicRepository topicRepository;
     private final ContentLookup contentLookup;
+    private final FeedbackCleanup feedbackCleanup;
 
     @Transactional(readOnly = true)
     public List<FlashcardResponse> listByTopic(UUID userId, UUID topicId, boolean isAdmin) {
@@ -122,6 +124,8 @@ public class FlashcardService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy từ vựng"));
         card.setDeletedAt(Instant.now());
         topicRepository.recountTotalWords(card.getTopicId());
+        // Xoá mềm không kích hoạt FK cascade: xoá cứng feedback của từ này trong cùng transaction
+        feedbackCleanup.onFlashcardDeleted(id);
     }
 
     private static void apply(Flashcard card, FlashcardRequest request) {

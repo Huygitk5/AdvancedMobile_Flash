@@ -13,6 +13,7 @@ import com.flash.content.entity.Quiz;
 import com.flash.content.repository.GrammarExampleRepository;
 import com.flash.content.repository.GrammarLessonRepository;
 import com.flash.content.repository.QuizRepository;
+import com.flash.feedback.service.FeedbackCleanup;
 import com.flash.progress.entity.UserGrammarProgress;
 import com.flash.progress.repository.UserGrammarProgressRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class GrammarService {
     private final UserGrammarProgressRepository progressRepository;
     private final QuizRepository quizRepository;
     private final ContentLookup contentLookup;
+    private final FeedbackCleanup feedbackCleanup;
 
     @Transactional(readOnly = true)
     public PageResponse<GrammarResponse> list(UUID userId, String keyword, ProgressFilter filter,
@@ -73,6 +75,8 @@ public class GrammarService {
     @Transactional
     public void delete(UUID id) {
         contentLookup.grammar(id, true).setDeletedAt(Instant.now());
+        // Xoá cứng feedback của bài này và feedback quiz của các quiz thuộc bài này
+        feedbackCleanup.onGrammarDeleted(id);
     }
 
     private GrammarDetailResponse detail(GrammarLesson lesson, UserGrammarProgress progress, boolean forAdmin) {

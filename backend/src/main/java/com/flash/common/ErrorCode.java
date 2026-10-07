@@ -32,6 +32,7 @@ public enum ErrorCode {
     ALREADY_CLAIMED(HttpStatus.CONFLICT, "Phần thưởng đã được nhận"),
     ALREADY_OWNED(HttpStatus.CONFLICT, "Bạn đã sở hữu vật phẩm này"),
     INSUFFICIENT_XP(HttpStatus.CONFLICT, "Không đủ XP"),
+    FEEDBACK_ALREADY_VIEWED(HttpStatus.CONFLICT, "Phản hồi đã được xem nên không thể sửa hoặc xoá"),
     // 422
     QUEST_NOT_COMPLETED(HttpStatus.UNPROCESSABLE_ENTITY, "Nhiệm vụ chưa hoàn thành"),
     BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_ENTITY, "Vi phạm quy tắc nghiệp vụ"),

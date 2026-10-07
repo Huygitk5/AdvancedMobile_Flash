@@ -14,6 +14,7 @@ import com.flash.content.repository.FlashcardRepository;
 import com.flash.content.repository.QuizQuestionOptionRepository;
 import com.flash.content.repository.QuizQuestionRepository;
 import com.flash.content.repository.QuizRepository;
+import com.flash.feedback.service.FeedbackCleanup;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class QuizService {
     private final QuizQuestionOptionRepository optionRepository;
     private final FlashcardRepository flashcardRepository;
     private final ContentLookup contentLookup;
+    private final FeedbackCleanup feedbackCleanup;
 
     @Transactional(readOnly = true)
     public List<QuizResponse> list(UUID topicId, UUID grammarLessonId, boolean includeUnpublished) {
@@ -76,6 +78,8 @@ public class QuizService {
     @Transactional
     public void delete(UUID id) {
         findQuiz(id, true).setDeletedAt(Instant.now());
+        // Xoá cứng feedback của quiz này
+        feedbackCleanup.onQuizDeleted(id);
     }
 
     private Quiz findQuiz(UUID id, boolean includeUnpublished) {

@@ -10,9 +10,12 @@ import '../../models/reward_item_model.dart';
 import '../../models/saved_word_topic_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/content_providers.dart';
+import '../../providers/feedback_providers.dart';
 import '../../providers/providers.dart';
 import '../../providers/user_providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/feedback_dialog.dart';
+import 'my_feedback_screen.dart';
 import 'saved_words_screen.dart';
 import 'settings_screen.dart';
 import 'shop_screen.dart';
@@ -98,6 +101,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(leaderboardProvider('XP'));
+            ref.invalidate(feedbackSummaryProvider);
             await ref.read(syncWorkerProvider).syncNow();
           },
           child: SingleChildScrollView(
@@ -247,6 +251,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 20),
                 _buildSavedWords(context),
                 const SizedBox(height: 20),
+                _buildMyFeedback(context),
+                const SizedBox(height: 20),
                 _buildInventory(),
               ],
             ),
@@ -315,6 +321,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             )
           else
             ...topics.take(5).map((topic) => _savedTopicRow(context, topic)),
+        ],
+      ),
+    );
+  }
+
+  /// Góp ý của tôi: số lượng theo loại (ẩn khi chưa tải được / offline), bấm để xem danh sách đã lọc sẵn.
+  Widget _buildMyFeedback(BuildContext context) {
+    final summary = ref.watch(feedbackSummaryProvider).value;
+    void open(FeedbackType? type) =>
+        Navigator.push(context, MaterialPageRoute(builder: (_) => MyFeedbackScreen(initialType: type)));
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.feedback_outlined, color: AppTheme.primaryColor),
+              const SizedBox(width: 8),
+              Expanded(child: Text(tr('Góp ý của tôi'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+              TextButton(
+                onPressed: () => open(null),
+                child: Text(tr('Xem tất cả'), style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final type in FeedbackType.values)
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => open(type),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(
+                  children: [
+                    Icon(type.icon, size: 20, color: AppTheme.greyColor),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(type.label, style: const TextStyle(fontSize: 15))),
+                    if (summary != null && summary.countOf(type) > 0) ...[
+                      Text('${summary.countOf(type)}',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                      const SizedBox(width: 6),
+                    ],
+                    const Icon(Icons.chevron_right, size: 20, color: AppTheme.greyColor),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
