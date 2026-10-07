@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../models/feedback_model.dart';
 import '../../models/quiz_review_model.dart';
 import '../../providers/content_providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/feedback_dialog.dart';
 
 /// Dựng từ `quiz_attempt_answers` ⨝ `quiz_questions` (đọc được offline).
 class QuizReviewScreen extends ConsumerWidget {
@@ -16,6 +18,8 @@ class QuizReviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(quizReviewProvider(attemptId));
+    // Quiz của lần làm này, để gửi góp ý cho đúng đề.
+    final attempt = ref.watch(quizAttemptProvider(attemptId)).value;
     return Scaffold(
       appBar: AppBar(
         title: Text(tr('Kết quả bài làm'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -27,8 +31,20 @@ class QuizReviewScreen extends ConsumerWidget {
         error: (e, _) => ErrorView(message: trf('Không đọc được bài làm: {e}', {'e': e})),
         data: (reviewData) => ListView.builder(
           padding: const EdgeInsets.all(20),
-          itemCount: reviewData.length,
-          itemBuilder: (context, index) => _QuestionReviewCard(questionIndex: index + 1, data: reviewData[index]),
+          itemCount: reviewData.length + 1,
+          itemBuilder: (context, index) {
+            if (index < reviewData.length) return _QuestionReviewCard(questionIndex: index + 1, data: reviewData[index]);
+            if (attempt == null) return const SizedBox.shrink();
+            return SafeArea(
+              top: false,
+              child: FeedbackIconButton(
+                type: FeedbackType.quiz,
+                itemId: attempt.quizId,
+                targetLabel: attempt.quizTitle,
+                label: tr('Gửi góp ý về bài kiểm tra'),
+              ),
+            );
+          },
         ),
       ),
     );

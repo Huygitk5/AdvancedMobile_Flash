@@ -7,7 +7,7 @@ class Quiz {
   /// 'TOPIC' | 'GRAMMAR'
   final String quizType;
   final String? topicId;
-  final String? grammarLessonId;
+  final String? grammarLessonId;  
   final int? timeLimitSeconds;
   final int passScorePercent;
   final int questionCount;

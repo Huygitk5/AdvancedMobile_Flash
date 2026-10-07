@@ -27,6 +27,7 @@ Khi khởi động, Flyway tự chạy (theo thứ tự version) rồi Hibernate
 | `V2__seed_content.sql` | `db/migration` | seed nhỏ (5 chủ đề, 5 ngữ pháp...) dùng cho test tích hợp |
 | `V3__otp_purpose_leaderboard.sql` | `db/migration` | OTP dùng chung nhiều mục đích, bảng xếp hạng có slogan và loại admin |
 | `V4__seed_vocabulary_grammar.sql` | `db/seed` | bộ nội dung đầy đủ: **18 chủ đề / 530 từ vựng** (mỗi từ có câu hỏi kiểm tra, mỗi chủ đề chia thành các bài ~10 câu) và **40 chủ điểm ngữ pháp** A1-C1 (giải thích, cấu trúc, ví dụ, bài kiểm tra 6 câu) |
+| `V5__feedback.sql` | `db/migration` | bảng `feedbacks`: phản hồi của user về từ vựng / ngữ pháp / bài kiểm tra (`item_id` đa hình, không có FK) |
 
 `db/seed` chỉ được nạp khi chạy app (`spring.flyway.locations`), **không** nạp trong test tích hợp để các test có dữ liệu cố định. Bộ seed lớn được kiểm riêng bởi `SeedContentTest` (MySQL riêng).
 
@@ -73,6 +74,21 @@ Tắt xác thực email khi phát triển: `REQUIRE_EMAIL_VERIFICATION=false` (�
 | `AUTH_RATE_LIMIT_PER_MINUTE` | `20` request/phút cho mỗi (IP, endpoint) `/v1/auth/**` |
 | `SYNC_RATE_LIMIT_PER_MINUTE` | `30` request/phút cho mỗi user, tính chung `/v1/sync/**` |
 
+## Feedback (phản hồi)
+
+User gửi phản hồi về một từ vựng (`feedbackFor=1`), bài ngữ pháp (`2`) hoặc bài kiểm tra (`3`); admin xem và đánh dấu đã xem.
+
+| API | Quyền | Mô tả |
+|---|---|---|
+| `POST /v1/feedbacks/create` `{feedbackFor, itemId, content}` | user | content trim, tối đa 1000 ký tự; item phải còn (chưa xoá mềm), nếu không `404` |
+| `GET /v1/feedbacks/me?feedbackFor=&from=&to=&page=&size=` | user | của chính mình, mới nhất trước; `from`/`to` là ngày `yyyy-MM-dd` (gồm cả `to`) theo `users.timezone` |
+| `GET /v1/feedbacks/me/summary` | user | `{flashcard, grammar, quiz}` |
+| `PUT /v1/feedbacks/update/{id}` `{content}`, `DELETE /v1/feedbacks/delete/{id}` | chủ sở hữu | chỉ khi `is_viewed=false` (1 câu UPDATE/DELETE có điều kiện); đã xem -> `409 FEEDBACK_ALREADY_VIEWED`, không phải của mình -> `404` |
+| `GET /v1/feedbacks?feedbackFor=&isViewed=&from=&to=&page=&size=` | ADMIN | của mọi user |
+| `PUT /v1/feedbacks/{id}/viewed` `{isViewed}` | ADMIN | đánh dấu đã xem / chưa xem |
+
+Item chỉ bị xoá mềm nên FK cascade không chạy: `FeedbackCleanup` xoá cứng feedback (bulk delete, cùng transaction) khi xoá flashcard / grammar (kèm quiz của nó) / quiz / topic (kèm flashcard và quiz của nó).
+
 ## Test
 
 ```bash
@@ -86,7 +102,7 @@ Test tích hợp chạy trên MySQL thật nên kiểm tra luôn Flyway và Hibe
 
 ## Quy ước
 
-- Đổi schema: sửa `docs/sql/server_mysql.sql` **và** thêm migration mới `V5__...sql` vào `db/migration`. Không sửa migration đã chạy.
+- Đổi schema: sửa `docs/sql/server_mysql.sql` **và** thêm migration mới `V6__...sql` vào `db/migration`. Không sửa migration đã chạy.
 - Nội dung học lớn thêm vào `db/seed`, không đặt trong `db/migration` (test tích hợp dựa vào seed nhỏ V2).
 - Entity map cột kiểu `CHAR(36)` sang `UUID` (`@Type(type = "uuid-char")`, `columnDefinition = "char"`). Các cột `ENUM`, `TINYINT`, `SMALLINT`, `TEXT`, `JSON`, `DECIMAL` cũng cần `columnDefinition` để `ddl-auto: validate` khớp.
 - `created_at` / `updated_at` do MySQL tự điền (`insertable = false, updatable = false`).

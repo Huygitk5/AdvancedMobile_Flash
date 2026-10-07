@@ -7,10 +7,12 @@ import '../../core/clock.dart';
 import '../../core/l10n.dart';
 import '../../core/speech.dart';
 import '../../core/theme.dart';
+import '../../models/feedback_model.dart';
 import '../../models/flashcard_model.dart';
 import '../../providers/content_providers.dart';
 import '../../providers/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/feedback_dialog.dart';
 import '../home/completion_screen.dart';
 import '../quiz/quiz_screen.dart';
 
@@ -208,6 +210,9 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
         title: Text(widget.topicTitle,
             maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         actions: [
+          // Góp ý cho từ đang hiển thị
+          if (currentCard != null)
+            FeedbackIconButton(type: FeedbackType.flashcard, itemId: currentCard.id, targetLabel: currentCard.word),
           if (quiz != null && quiz.questionCount > 0)
             IconButton(
               tooltip: tr('Kiểm tra'),

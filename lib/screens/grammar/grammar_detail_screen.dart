@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/clock.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../models/feedback_model.dart';
 import '../../models/grammar_model.dart';
 import '../../providers/content_providers.dart';
 import '../../providers/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/feedback_dialog.dart';
 import '../home/completion_screen.dart';
 import '../quiz/quiz_screen.dart';
 
@@ -134,6 +136,7 @@ class _GrammarDetailScreenState extends ConsumerState<GrammarDetailScreen> {
                           child: Text(g.level,
                               style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
+                        FeedbackIconButton(type: FeedbackType.grammar, itemId: g.id, targetLabel: g.title),
                       ],
                     ),
                     if (g.bestScorePercent != null) ...[
