@@ -26,6 +26,11 @@ class AppPrefs {
   static const _kLastSynced = 'last_synced_timestamp';
   static const _kDbOwner = 'local_db_owner_user_id';
   static const _kWidgetPrompt = 'home_widget_prompt_done';
+  static const _kWidgetEnabled = 'widget_enabled';
+  static const _kWidgetSrcDefault = 'widget_src_default';
+  static const _kWidgetSrcTopics = 'widget_src_topics';
+  static const _kWidgetTopicIds = 'widget_topic_ids';
+  static const _kWidgetSrcSaved = 'widget_src_saved';
 
   bool get isDarkMode => _p.getBool(_kDarkMode) ?? false;
   Future<void> setDarkMode(bool v) => _p.setBool(_kDarkMode, v);
@@ -71,6 +76,25 @@ class AppPrefs {
   /// Đã bấm "Thêm widget" / "Để sau" trên thẻ gợi ý ở Trang chủ → không hiện thẻ đó nữa.
   bool get homeWidgetPromptDone => _p.getBool(_kWidgetPrompt) ?? false;
   Future<void> setHomeWidgetPromptDone(bool v) => _p.setBool(_kWidgetPrompt, v);
+
+  // --- Cấu hình widget màn hình chính (theo thiết bị)
+  bool get widgetEnabled => _p.getBool(_kWidgetEnabled) ?? true;
+  Future<void> setWidgetEnabled(bool v) => _p.setBool(_kWidgetEnabled, v);
+
+  /// Nguồn "Từ chưa nhớ + ôn hôm nay".
+  bool get widgetSrcDefault => _p.getBool(_kWidgetSrcDefault) ?? true;
+  Future<void> setWidgetSrcDefault(bool v) => _p.setBool(_kWidgetSrcDefault, v);
+
+  /// Nguồn "Chủ đề đã chọn" (các chủ đề nằm ở [widgetTopicIds]).
+  bool get widgetSrcTopics => _p.getBool(_kWidgetSrcTopics) ?? false;
+  Future<void> setWidgetSrcTopics(bool v) => _p.setBool(_kWidgetSrcTopics, v);
+
+  List<String> get widgetTopicIds => _p.getStringList(_kWidgetTopicIds) ?? const [];
+  Future<void> setWidgetTopicIds(List<String> v) => _p.setStringList(_kWidgetTopicIds, v);
+
+  /// Nguồn "Từ đã lưu".
+  bool get widgetSrcSaved => _p.getBool(_kWidgetSrcSaved) ?? false;
+  Future<void> setWidgetSrcSaved(bool v) => _p.setBool(_kWidgetSrcSaved, v);
 
   /// Đăng xuất: xoá phần gắn với tài khoản, giữ cài đặt UI.
   Future<void> resetUserScoped() async {

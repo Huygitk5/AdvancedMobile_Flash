@@ -24,6 +24,7 @@ import '../grammar/grammar_detail_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../profile/profile_screen.dart' show borderColorsOf;
 import '../profile/settings_screen.dart';
+import '../profile/widget_settings_screen.dart';
 import '../vocabulary/topic_screen.dart';
 
 /// Mọi số liệu đọc từ SQLite nên mở offline vẫn hiển thị đủ.
@@ -76,9 +77,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
   }
 
-  // Đường dẫn widget gửi về: flashwidget://study?topic=<id>&title=<tên>.
+  // Đường dẫn widget gửi về: flashwidget://study?topic=<id>&title=<tên>,
+  // hoặc flashwidget://settings/widget khi widget đang tắt.
   void _openFromWidget(Uri? uri) {
     if (uri == null || !mounted) return;
+    if (uri.host == 'settings') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const WidgetSettingsScreen()));
+      return;
+    }
     final topicId = uri.queryParameters['topic'];
     if (topicId == null || topicId.isEmpty) return; // chạm khi không có thẻ: chỉ mở app
     Navigator.push(

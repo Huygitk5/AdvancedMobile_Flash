@@ -10,6 +10,7 @@ import '../../providers/providers.dart';
 import '../../widgets/common.dart';
 import '../splash/server_settings_dialog.dart';
 import 'change_password_screen.dart';
+import 'widget_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -19,14 +20,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  late final Future<bool> _canPinWidget = HomeWidgetService.canRequestPin();
-
-  Future<void> _addHomeWidget() async {
-    await ref.read(appPrefsProvider).setHomeWidgetPromptDone(true);
-    final ok = await HomeWidgetService.requestPin(ref.read(dbProvider));
-    if (!ok && mounted) showAppSnack(context, tr('Không thêm được widget'), error: true);
-  }
-
   /// AppPrefs đọc đồng bộ; mỗi lần đổi gọi setState để vẽ lại. Cài đặt lưu trên máy và đồng bộ lên server (SETTINGS_UPDATE).
   Future<void> _update(Future<void> Function() change, String Function() message, {IconData? icon}) async {
     await change();
@@ -140,17 +133,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildDivider(),
                       _buildListTile(Icons.lock_outline, tr('Đổi mật khẩu'),
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
-                      // Chỉ Android + launcher hỗ trợ ghim widget.
-                      FutureBuilder<bool>(
-                        future: _canPinWidget,
-                        builder: (context, snap) => snap.data != true
-                            ? const SizedBox.shrink()
-                            : Column(children: [
-                                _buildDivider(),
-                                _buildListTile(Icons.widgets_outlined, tr('Thêm widget ra màn hình chính'),
-                                    onTap: _addHomeWidget),
-                              ]),
-                      ),
+                      // Widget màn hình chính chỉ có trên Android.
+                      if (HomeWidgetService.supported) ...[
+                        _buildDivider(),
+                        _buildListTile(Icons.widgets_outlined, tr('Widget màn hình chính'),
+                            onTap: () => Navigator.push(
+                                context, MaterialPageRoute(builder: (_) => const WidgetSettingsScreen()))),
+                      ],
                       // _buildDivider(),
                       // _buildListTile(Icons.dns_outlined, tr('Địa chỉ máy chủ'),
                       //     trailingText: Uri.tryParse(AppConfig.apiBaseUrl)?.host ?? '', onTap: () async {
