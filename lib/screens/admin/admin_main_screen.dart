@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import 'admin_content_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_economy_screen.dart';
+import 'admin_feedback_screen.dart';
 import 'admin_users_screen.dart';
 import 'dart:ui';
 
@@ -22,6 +23,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     const AdminUsersScreen(),
     const AdminContentScreen(),
     const AdminEconomyScreen(),
+    const AdminFeedbackScreen(),
   ];
 
   static const double _barHeight = 60; // thanh nền
@@ -32,6 +34,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     _NavData(Icons.people_alt, tr('Học viên'), const Color(0xFF2FBF71)),
     _NavData(Icons.library_books, tr('Nội dung'), const Color(0xFF8B5CF6)),
     _NavData(Icons.storefront, tr('Kinh tế'), const Color(0xFFFF9F1C)),
+    _NavData(Icons.feedback_outlined, tr('Phản hồi'), const Color(0xFFE5484D)),
   ];
 
   @override

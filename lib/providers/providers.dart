@@ -4,6 +4,7 @@ import '../data/local/app_database.dart';
 import '../data/remote/api_client.dart';
 import '../data/remote/apis/admin_api.dart';
 import '../data/remote/apis/auth_api.dart';
+import '../data/remote/apis/feedback_api.dart';
 import '../data/remote/apis/gamification_api.dart';
 import '../data/remote/apis/sync_api.dart';
 import '../data/remote/apis/user_api.dart';
@@ -40,6 +41,9 @@ final gamificationApiProvider = Provider<GamificationApi>((ref) => GamificationA
 
 /// Admin chỉ online: gọi thẳng API, không qua SQLite.
 final adminApiProvider = Provider<AdminApi>((ref) => AdminApi(ref.watch(apiClientProvider)));
+
+/// Góp ý (user + admin): online-only, gọi thẳng API.
+final feedbackApiProvider = Provider<FeedbackApi>((ref) => FeedbackApi(ref.watch(apiClientProvider)));
 
 // ---------------------------------------------------------------- Sync (G7)
 

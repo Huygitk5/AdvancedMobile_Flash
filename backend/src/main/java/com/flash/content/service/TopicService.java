@@ -7,6 +7,7 @@ import com.flash.content.dto.TopicRequest;
 import com.flash.content.dto.TopicResponse;
 import com.flash.content.entity.Topic;
 import com.flash.content.repository.TopicRepository;
+import com.flash.feedback.service.FeedbackCleanup;
 import com.flash.progress.entity.UserTopicProgress;
 import com.flash.progress.repository.UserTopicProgressRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class TopicService {
     private final TopicRepository topicRepository;
     private final UserTopicProgressRepository progressRepository;
     private final ContentLookup contentLookup;
+    private final FeedbackCleanup feedbackCleanup;
 
     @Transactional(readOnly = true)
     public PageResponse<TopicResponse> list(UUID userId, String keyword, ProgressFilter filter,
@@ -62,6 +64,8 @@ public class TopicService {
     @Transactional
     public void delete(UUID id) {
         contentLookup.topic(id, true).setDeletedAt(Instant.now());
+        // Xoá cứng feedback flashcard của mọi từ trong topic và feedback quiz của mọi quiz thuộc topic
+        feedbackCleanup.onTopicDeleted(id);
     }
 
     private static void apply(Topic topic, TopicRequest request) {
